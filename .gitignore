@@ -13,3 +13,4 @@ containers/*
 output/
 test.nf
 error_logs/
+NOTES.md
