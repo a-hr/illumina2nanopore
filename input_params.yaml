@@ -1,0 +1,8 @@
+# Use this tamplate to pass your parameters to Nextflow.
+
+# TIP: use $baseDir to refer to the directory where main.nf is located
+# You can also use full paths instead  
+
+# ---- required settings ----
+fast5_dir: "${baseDir}/inputs/fast5s" # folder containing the fastq files
+output_dir: "${baseDir}/output/fastqs" # folder to contain the outputs, created if not found

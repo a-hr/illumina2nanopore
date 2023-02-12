@@ -1,0 +1,15 @@
+# nextflow log and cache files
+.nextflow/
+.nextflow.log*
+work/
+*.out
+*.txt
+
+# project large files
+inputs/fast5s/*
+containers/*
+
+# project output and test files
+output/
+test.nf
+error_logs/
