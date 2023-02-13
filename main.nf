@@ -3,16 +3,17 @@ nextflow.enable.dsl=2
 
 process basecall {
     tag "${fast5}"
-    publishDir "${params.output_dir}/fastqs", mode: 'move', saveAs: { out_name }
+    publishDir "${params.output_dir}/fastqs", mode: 'copy', saveAs: { out_name }
     
     input:
-        tuple val(pattern), path(fast5)
+        path fast5
     output:
-        tuple val($pattern), path "pass/*.gz"
+        path "pass/*.gz"
+
     script:
         out_name = fast5.simpleName + ".fastq.gz"
         """
-        guppy_basecaller -i . -s . -c dna_r9.4.1_450bps_hac.cfg --num_callers 1 --cpu_threads_per_caller 8 --compress_fastq
+        guppy_basecaller -i . -s . -c ${params.config_file} --num_callers 1 --cpu_threads_per_caller 8 --compress_fastq
         """
 }
 
@@ -31,28 +32,37 @@ process fastqc {
 }
 
 process merge_fastqs {
-    publishDir "${params.output_dir}/fastq"
+    publishDir "${params.output_dir}/fastq", mode: "copy"
 
     input:
-        tuple val(pattern), path(fastqs)
+        val sample
+        path "${sample}_??.fastq.gz"
     output:
-        path merged_fastq
+        path "merged_*.fastq.gz"
 
+    
     """
-    cat $pattern*gz > merged_${pattern}.fastq.gz
+    cat ${sample}*.fastq.gz > merged_${sample}.fastq.gz
     """
 
 }
 
+// Function definitions
+def getPrefix(file) {
+    return (file.name =~ /(.*)_[0-9]{1,10}\.fast5/)[0][1]
+}
+
 // Define variables
-Channel.fromFilePairs("${params.fast5_dir}/*.fast5", size: -1).set{fast5_files}
+Channel.fromPath("${params.fast5_dir}/*.fast5").set{fast5_files}
 Channel.fromPath(params.fast5_dir, type: 'dir').set{fast5_dir}
+
+prefix = fast5_files.map{ it -> getPrefix(it)}.first()
 
 workflow {
     
     fast5_files \
-    | basecall | collect | groupTuple \
-    | merge_fastqs
+    | basecall
+    merge_fastqs(prefix, basecall.out.collect())
     
     /*
     fast5_dir \
