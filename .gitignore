@@ -6,7 +6,7 @@ work/
 *.txt
 
 # project large files
-inputs/fast5s/*
+inputs/*
 containers/*
 
 # project output and test files

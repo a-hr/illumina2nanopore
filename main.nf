@@ -16,7 +16,32 @@ process basecall {
         """
 }
 
+process fastqc {
+    tag "${fast5_dir}"
+    publishDir "${params.output_dir}/fastqc", mode: 'copy'
+    
+    input:
+        path fast5_dir
+    output:
+        path "*_fastqc.{zip,html}"
+    
+    """
+    fastqc --nano -t 8 -o . ${fast5_dir}
+    """
+}
+
+// Define variables
+Channel.fromPath("${params.fast5_dir}/*.fast5").set{fast5_files}
+Channel.fromPath(params.fast5_dir, type: 'dir').set{fast5_dir}
+
+ignore_basecall = true
+
 workflow {
-    Channel.fromPath("${params.fast5_dir}/*.fast5") \
-    | basecall
+    if(!ignore_basecall) {
+        fast5_files \
+        | basecall
+    }
+
+    fast5_dir \
+    | fastqc
 }

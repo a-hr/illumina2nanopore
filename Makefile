@@ -12,4 +12,4 @@ clean:
 	clear
 
 kill:
-	squeue -u blazquL | grep $n | awk '{print $1}' | xargs -n 1 scancel
+	squeue -u blazquL | grep $n | awk '{print $$1}' | xargs -n 1 scancel
