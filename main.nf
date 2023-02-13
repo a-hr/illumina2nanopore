@@ -6,9 +6,9 @@ process basecall {
     publishDir "${params.output_dir}/fastqs", mode: 'move', saveAs: { out_name }
     
     input:
-        path fast5
+        tuple val(pattern), path(fast5)
     output:
-        path "pass/*.gz"
+        tuple val($pattern), path "pass/*.gz"
     script:
         out_name = fast5.simpleName + ".fastq.gz"
         """
@@ -30,18 +30,32 @@ process fastqc {
     """
 }
 
+process merge_fastqs {
+    publishDir "${params.output_dir}/fastq"
+
+    input:
+        tuple val(pattern), path(fastqs)
+    output:
+        path merged_fastq
+
+    """
+    cat $pattern*gz > merged_${pattern}.fastq.gz
+    """
+
+}
+
 // Define variables
-Channel.fromPath("${params.fast5_dir}/*.fast5").set{fast5_files}
+Channel.fromFilePairs("${params.fast5_dir}/*.fast5", size: -1).set{fast5_files}
 Channel.fromPath(params.fast5_dir, type: 'dir').set{fast5_dir}
 
-ignore_basecall = true
-
 workflow {
-    if(!ignore_basecall) {
-        fast5_files \
-        | basecall
-    }
-
+    
+    fast5_files \
+    | basecall | collect | groupTuple \
+    | merge_fastqs
+    
+    /*
     fast5_dir \
     | fastqc
+    */
 }
