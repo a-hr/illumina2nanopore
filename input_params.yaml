@@ -3,8 +3,21 @@
 # TIP: use $baseDir to refer to the directory where main.nf is located
 # You can also use full paths instead  
 
-# ---- required settings ----
+# ---- required paths ----
 fast5_dir: "${baseDir}/inputs/fast5" # folder containing the fastq files
 fastq_dir: "${baseDir}/inputs/fastq" # folder containing the fastq files
 output_dir: "${baseDir}/output/" # folder to contain the outputs, created if not found
+
+# ---- basecalling config ----
 config_file: "dna_r9.4.1_450bps_hac.cfg" # kit and flowcell configuration file
+
+# ---- trimming config ----
+five_prime_fw: "AATGATACGGCGACCACCGAGATCTACA"
+three_prime_fw: "TATGCCGTCTTCTGCTTG"
+five_prime_rv: "CAAGCAGAAGACGGCATA"
+three_prime_rv: "TGTAGATCTCGGTGGTCGCCGTATCATT"
+
+# ---- alignment config ----
+
+# ---- other config ----
+multiqc_config: "${baseDir}/assets/multiqc_config.yaml" # multiqc config file
