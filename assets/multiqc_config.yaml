@@ -1,0 +1,12 @@
+module_order:
+  - fastqc:
+      name: "FastQC (raw)"
+      info: "Raw basecalled reads."
+      path_filters:
+        - "./raw_fastqc/*.zip"
+  - cutadapt
+  - fastqc:
+      name: "FastQC (5' and 3' adapters trimmed)"
+      info: "This section of the report shows FastQC results after adapter trimming."
+      path_filters:
+        - "./trimmed_fastqc/*.zip"

@@ -1,131 +1,81 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
-process basecall {
-    tag "${fast5}"
-    
-    input:
-        path fast5
-    output:
-        path "pass/*.gz"
+// include modules
+include { basecall } from './modules/basecall'
+include { fastqc as raw_fastqc; fastqc as trimmed_fastqc} from './modules/fastqc'
+include { merge_fastqs } from './modules/merge_fastqs'
+include { multiqc } from './modules/multiqc'
+include { demultiplex_stats; reverse_complement } from './modules/seqkit'
+include { adapter_trim } from './modules/trimming'
 
-    script:
-        out_name = fast5.simpleName + ".fastq.gz"
-        """
-        guppy_basecaller -i . -s . -c ${params.config_file} --num_callers 1 --cpu_threads_per_caller 8 --compress_fastq
-        """
-}
-
-process fastqc {
-    tag "${fastq_file}"
-    publishDir "${params.output_dir}/fastqc", mode: 'copy'
-    
-    input:
-        path fastq_file
-    output:
-        path "*_fastqc.{zip,html}"
-    
-    """
-    fastqc -t 8 -o . ${fastq_file}
-    """
-}
-
-process merge_fastqs {
-    publishDir "${params.output_dir}/fastq", mode: "copy"
-
-    input:
-        val sample
-        path "${sample}_??.fastq.gz"
-    output:
-        path "merged_*.fastq.gz"
-
-    """
-    cat ${sample}*.fastq.gz > merged_${sample}.fastq.gz
-    """
-}
-
-process multiqc {
-    publishDir "${params.output_dir}/multiqc", mode: "copy"
-
-    input:
-        path fastqc_log
-        path demultiplex_log
-    output:
-        path "multiqc_report.html"
-
-    """
-    multiqc .
-    """
-}
-
-process seqkit {
-    tag "${fastq_file}"
-    publishDir "${params.output_dir}/seqkit", mode: 'copy'
-    
-    input:
-        path fastq_file
-    output:
-        path "*_seqkit.{txt,html}"
-    
-    """
-    seqkit stats -a -T ${fastq_file} > ${fastq_file.simpleName}_seqkit.txt
-    """
-}
-
-process adapter_trim {
-    // trims the adapters, filters by length and demultiplexes by strand (forward/reverse)
-    tag "${fastq_file}"
-    publishDir "${params.output_dir}/trimmed_fastqs", pattern: "trimmed_*.fastq.gz", mode: 'copy'
-    
-    input:
-        path fastq_file
-    output:
-        path "trimmed_*.fastq.gz", emit: trimmed_fastqs
-        path "*_demultiplex.log", emit: log
-    
-    """
-    cutadapt \\
-        -j 0 \\
-        -a forward="AATGATACGGCGACCACCGAGATCTACA...TATGCCGTCTTCTGCTTG" \\
-        -a reverse="CAAGCAGAAGACGGCATA...TGTAGATCTCGGTGGTCGCCGTATCATT" \\
-        -e 0.2 \\
-        -m 50 \\
-        -M 300 \\
-        -o trimmed_{name}.fastq.gz \\
-        ${fastq_file} > ${fastq_file.simpleName}_demultiplex.log
-    """
-}
-
-// Function definitions
+// function definitions
 def getPrefix(file) {
     return (file.name =~ /(.*)_[0-9]{1,10}\.fast5/)[0][1]
 }
 
-// Define variables
-Channel.fromPath("${params.fast5_dir}/*.fast5").set{fast5_files}
-Channel.fromPath(params.fast5_dir, type: 'dir').set{fast5_dir}
-Channel.fromPath("${params.fastq_dir}/merged_*.fastq.gz").set{fastq_file}
+// ------------ VARIABLES ------------
+// paths
+Channel
+    .fromPath("${params.fast5_dir}/*.fast5")
+    .set{fast5_files}
+Channel
+    .fromPath(params.fast5_dir, type: 'dir')
+    .set{fast5_dir}
+Channel
+    .fromPath("${params.fastq_dir}/merged_*.fastq.gz")
+    .set{fastq_file}
+
+// config files
+Channel
+    .fromPath(params.multiqc_config)
+    .set{multiqc_config}
+
+// input parameters
+Channel
+    .from([params.five_prime_fw, params.three_prime_fw])
+    .collect()
+    .set{fw_adapters}
+Channel
+    .from([params.five_prime_rv, params.three_prime_rv])
+    .collect()
+    .set{rv_adapters}
 
 prefix = fast5_files.map{ it -> getPrefix(it)}.first()
 
 workflow {
-    
     // fast5_files \
     // | basecall
     // merge_fastqs(prefix, basecall.out.collect())
     
-    fastq_file \
-    | adapter_trim
+    // raw read QC
+    raw_fastqc(fastq_file)
+    fastqc_logs = raw_fastqc.out
+    
+    // adapter trimming/demultiplexing
+    adapter_trim(
+        fw_adapters,
+        rv_adapters,
+        fastq_file
+    )
 
-    adapter_trim.out.trimmed_fastqs \
-    | fastqc
-
-    adapter_trim.out.trimmed_fastqs \
-    | seqkit
-
-    fastqc_logs = fastqc.out
     demultiplex_logs = adapter_trim.out.log
 
-    multiqc(fastqc_logs, demultiplex_logs)
+    // trimmed fastq QC
+    adapter_trim.out.trimmed_fastqs \
+    | (trimmed_fastqc & demultiplex_stats)
+
+    fastqc_logs = fastqc_logs.concat(trimmed_fastqc.out).collect()  // makes multiqc wait for all to be emitted
+
+    // reverse complement of trimmed fastqs
+    adapter_trim.out.trimmed_fastqs | flatten \
+    | reverse_complement
+
+    // multiqc
+    multiqc(
+        fastqc_logs,
+        demultiplex_logs,
+        multiqc_config
+    )
 
 }
