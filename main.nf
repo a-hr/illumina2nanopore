@@ -71,6 +71,14 @@ workflow {
     adapter_trim.out.trimmed_fastqs | flatten \
     | reverse_complement
 
+    // demutiplex by barcode
+
+    // extract UMI
+
+    // map to reference
+
+    // deduplicate
+
     // multiqc
     multiqc(
         fastqc_logs,
