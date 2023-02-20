@@ -1,4 +1,4 @@
-# Use this tamplate to pass your parameters to Nextflow.
+# Use this template to pass your parameters to Nextflow.
 
 # TIP: use $baseDir to refer to the directory where main.nf is located
 # You can also use full paths instead  
