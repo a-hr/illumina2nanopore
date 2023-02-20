@@ -1,8 +1,3 @@
-git:
-	git add .
-	git commit -m "$m"
-	git push -u origin main
-
 clean:
 	rm -rf work/
 	rm -rf output/
@@ -13,3 +8,13 @@ clean:
 
 kill:
 	squeue -u blazquL | grep $n | awk '{print $$1}' | xargs -n 1 scancel
+
+pull:
+	echo "Pulling containers ..."
+	@mkdir -p containers
+	@for container in `grep -oP "(?<=container = ').*(?=')" conf/cluster.config`; do \
+		echo "Pulling $$container ..."; \
+		containerName=`echo $$container | sed 's/\//-/g' | sed 's/:/-/g'`; \
+		singularity -s pull --name $$containerName.img --dir containers/ docker://$$container; \
+	done
+	@echo "Done!"
