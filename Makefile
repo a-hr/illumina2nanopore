@@ -1,10 +1,9 @@
 clean:
-	rm -rf work/
-	rm -rf output/
-	rm -f slurm*.out
-	rm -f trace*.txt
-	rm -f .nextflow.log*
-	clear
+	@rm -rf work/
+	@rm -rf output/
+	@rm -f slurm*.out
+	@rm -f trace*.txt
+	@rm -f .nextflow.log*
 
 kill:
 	squeue -u blazquL | grep $n | awk '{print $$1}' | xargs -n 1 scancel
