@@ -6,7 +6,7 @@ clean:
 	@rm -f .nextflow.log*
 
 kill:
-	squeue -u blazquL | grep $n | awk '{print $$1}' | xargs -n 1 scancel
+	squeue -u $u | grep $n | awk '{print $$1}' | xargs -n 1 scancel
 
 pull:
 	echo "Pulling containers ..."
