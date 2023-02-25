@@ -1,5 +1,5 @@
 process merge_fastqs {
-    publishDir "${params.output_dir}/fastq", mode: "copy"
+    publishDir "${params.output_dir}/fastqs/basecalled", mode: 'copy', enabled: params.publish_merged
 
     input:
         val sample
