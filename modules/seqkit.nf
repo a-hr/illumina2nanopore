@@ -9,7 +9,7 @@ process stats {
         path "*_stats.tsv"
     
     """
-    seqkit stats -a -T *fastq.gz > ${name}_${fastq_file[0].simpleName}_demultiplex_stats.tsv
+    seqkit stats -a -T *fastq.gz > ${name}_${fastq_files[0].simpleName}_demultiplex_stats.tsv
     """
 }
 
