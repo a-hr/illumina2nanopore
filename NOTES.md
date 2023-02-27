@@ -24,3 +24,5 @@
     * son fw seguro pq tienen cola polyA
     * son fw pq tenian adaptadores fw
     * tienen barcodes reverse!!! --> ¿está mal el archivo de barcodes de Ane?
+
+# Options

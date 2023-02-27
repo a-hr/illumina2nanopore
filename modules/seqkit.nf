@@ -1,21 +1,24 @@
 process stats {
-    tag "${fastq_files} stats"
+    tag "demultiplex_stats"
+
     publishDir "${params.output_dir}/seqkit", mode: 'copy'
     
     input:
         path fastq_files
         val name
     output:
-        path "*_stats.tsv"
+        path "*stats.tsv"
     
     """
-    seqkit stats -a -T *fastq.gz > ${name}_${fastq_files[0].simpleName}_demultiplex_stats.tsv
+    seqkit stats -a -T *fastq.gz > ${name}_demultiplex_stats.tsv
     """
 }
 
 process reverse_complement {
     tag "${fastq_file.simpleName}"
-    publishDir "${params.output_dir}/fastqs/complemented", mode: 'copy', enabled: params.publish_complemented
+    
+    publishDir "${params.output_dir}/fastqs/complemented", mode: 'copy',
+        enabled: params.publish_complemented
     
     input:
         path fastq_file

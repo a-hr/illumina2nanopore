@@ -1,6 +1,8 @@
 process basecall {
     tag "${fast5}"
-    publishDir "${params.output_dir}/fastqs/basecalled", mode: 'copy', enabled: params.publish_basecalled
+    publishDir "${params.output_dir}/fastqs/basecalled",
+        mode: 'copy',
+        enabled: params.publish_basecalled
     
     input:
         path fast5

@@ -3,11 +3,27 @@ nextflow.enable.dsl=2
 
 // include modules
 include { basecall } from './modules/basecall'
-include { fastqc as raw_fastqc; fastqc as trimmed_fastqc} from './modules/fastqc'
-include { merge_fastqs } from './modules/merge_fastqs'
+
+include { 
+    fastqc as raw_fastqc;
+    fastqc as trimmed_fastqc} from './modules/fastqc'
+
+include { 
+    merge_fastqs;
+    merge_forward_reverse} from './modules/merge_fastqs'
+
 include { multiqc } from './modules/multiqc'
-include { stats as adapter_stats; stats as bc_stats; reverse_complement} from './modules/seqkit'
-include { adapter_trim; demultiplex_bc } from './modules/demultiplexing'
+
+include {
+    stats as orientation_stats;
+    stats as lib_stats;
+    stats as bc_stats;
+    reverse_complement} from './modules/seqkit'
+
+include { 
+    demultiplex_orientation;
+    demultiplex_bc;
+    demultiplex_library } from './modules/cutadapt'
 
 // function definitions
 def getPrefix(file) {
@@ -26,8 +42,14 @@ Channel
     .fromPath("${params.fastq_dir}/merged_*.fastq.gz")
     .set{fastq_file}
 Channel
-    .value(params.csv_file)
-    .set{csv_file}
+    .value(params.bc_csv)
+    .set{bc_csv}
+Channel
+    .value(params.lib_csv)
+    .set{lib_csv}
+Channel
+    .value(params.multiqc_config)
+    .set{multiqc_config}
 
 // config files
 Channel
@@ -36,11 +58,11 @@ Channel
 
 // input parameters
 Channel
-    .from([params.five_prime_fw, params.three_prime_fw])
+    .from([params.fw_fp_P5_1, params.fw_tp_P3_1])
     .collect()
     .set{fw_adapters}
 Channel
-    .from([params.five_prime_rv, params.three_prime_rv])
+    .from([params.rv_fp_P3_1, params.rv_tp_P5_1])
     .collect()
     .set{rv_adapters}
 
@@ -55,52 +77,74 @@ workflow {
     raw_fastqc(fastq_file)
     fastqc_logs = raw_fastqc.out
     
-    // adapter trimming/demultiplexing
-    adapter_trim(
+    /* 
+    - P5 and P3 adapter trimming
+    - orientation guess (forward or reverse) based demultiplexing
+    */
+    demultiplex_orientation(
         fw_adapters,
         rv_adapters,
         fastq_file
     )
 
-    adapter_demultiplex_logs = adapter_trim.out.log
+    dmplx_orient_logs = demultiplex_orientation.out.log
 
-    // trimmed fastq QC
-    adapter_trim.out.trimmed_fastqs \
-    | trimmed_fastqc 
-
-    adapter_stats(
-        adapter_trim.out.trimmed_fastqs,
-        "adapter_trimmed"
+    /* QC on demultiplexed files */
+    demultiplex_orientation.out.trimmed_fastqs \
+    | trimmed_fastqc
+    
+    orientation_stats(
+        demultiplex_orientation.out.trimmed_fastqs,
+        "orientation_dmplexed"
     )
 
     fastqc_logs = fastqc_logs
         .concat(trimmed_fastqc.out)
         .collect()  // makes multiqc wait for all to be emitted
 
-    // reverse complement of trimmed fastqs, filter out files containing unknown in the name
-    adapter_trim.out.trimmed_fastqs | flatten \
+    /* REVERSE COMPLEMENT OF TRIMMED READS
+    - merge fw_R1 and rv_R2 into final_R1
+    - discard fw_R2, rv_R1 and unknown
+    */
+
+    demultiplex_orientation.out.trimmed_fastqs \
+    | flatten \
     | filter { it =~ /^((?!.*(unknown).*).)*$/ } \
     | reverse_complement
 
-    //* notas: podemos quedarnos solo con forward y seguir adelante, o tomar forward y reverse y hacer un reverse complement de ambos y cruzarlos
-    //*     - forward_R1 + reverse_R2 = final_R1
-    //*     - forward_R2 + reverse_R1 = final_R2
-    //* DE MOMENTO LOS UNIMOS
-
-    //! from here on, we only use on pair of reads (forward and reverse)
-
-    // demutiplex by barcode
-    demultiplex_bc(
-        reverse_complement.out,
-        csv_file
+    reverse_complement.out \
+    | flatten \
+    | filter { it.name =~ /^(forward_R1|reverse_R2)\.fastq.gz$/ } \
+    | collect \
+    | merge_forward_reverse
+    
+    /* LIBRARY DEMULTIPLEXING */
+    demultiplex_library(
+        merge_forward_reverse.out,
+        lib_csv
     )
 
-    bc_stats(
-        demultiplex_bc.out.fastqs,
-        "demultiplexed"
+    lib_stats(
+        demultiplex_library.out.fastqs,
+        "library_dmplexed"
     )
 
-    bc_demultiplex_logs = demultiplex_bc.out.log
+    dmplx_lib_logs = demultiplex_library.out.log
+
+    /* INTERNAL ADAPTER TRIMMING */
+    
+    /* BARCODE DEMULTIPLEXING */
+    // demultiplex_bc(
+    //     reverse_complement.out,
+    //     bc_csv
+    // )
+
+    // bc_stats(
+    //     demultiplex_bc.out.fastqs,
+    //     "demultiplexed"
+    // )
+
+    // bc_demultiplex_logs = demultiplex_bc.out.log
 
     // extract UMI
 
@@ -111,7 +155,7 @@ workflow {
     // multiqc
     multiqc(
         fastqc_logs,
-        adapter_demultiplex_logs,
+        dmplx_orient_logs,
         multiqc_config
     )
 
