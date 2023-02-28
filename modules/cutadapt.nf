@@ -29,7 +29,7 @@ process demultiplex_orientation {
 
 process demultiplex_library {
     tag { fastq.name }
-    publishDir "${params.output_dir}/lib_demultiplexed",
+    publishDir "${params.output_dir}/fastqs/lib_demultiplexed",
         pattern: "*fastq.gz",
         mode: 'copy',
         enabled: params.publish_lib_demultiplexed
@@ -51,12 +51,12 @@ process demultiplex_library {
 process demultiplex_bc {
     tag { prefix }
 
-    publishDir "${params.output_dir}/bc_demultiplexed",
+    publishDir "${params.output_dir}/fastqs/bc_demultiplexed",
         mode: 'copy',
         enabled: params.publish_bc_demultiplexed
 
     input:
-        path fastqs
+        path fastq
         path barcode_file
 
     output:
@@ -64,9 +64,35 @@ process demultiplex_bc {
         path "*.log", emit: log
 
     script:
-    name = fastqs[0].simpleName
-    prefix = name.endsWith('_R1') ? name - '_R1' : name - '_R2'
+    prefix = fastq.simpleName
     """
-    demultiplex.py -b ${barcode_file} -f . -s ${params.suffix1} ${params.suffix2} > ${prefix}.log
+    demultiplex_SE.py -b ${barcode_file} -f . > dmplex_bc_${prefix}.log
+    """
+}
+
+process adapter_trim {
+    tag { fastq.name }
+    publishDir "${params.output_dir}/fastqs/trimmed",
+        pattern: "*fastq.gz",
+        mode: 'copy',
+        enabled: params.publish_trimmed
+
+    input:
+        path fastq
+        tuple val(five_prime), val(three_prime)
+
+    output:
+        path "trimmed_*fastq.gz", emit: fastqs
+        path "*.log", emit: log
+
+    """
+    cutadapt \\
+        -j 0 \\
+        -e 0.2 \\
+        --no-indels \\
+        --discard-untrimmed \\
+        -g ${five_prime}...${three_prime} \\
+        -o trimmed_${fastq} \\
+        ${fastq} > adapter_trim.log
     """
 }

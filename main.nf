@@ -6,7 +6,7 @@ include { basecall } from './modules/basecall'
 
 include { 
     fastqc as raw_fastqc;
-    fastqc as trimmed_fastqc} from './modules/fastqc'
+    fastqc as oriented_fastqc} from './modules/fastqc'
 
 include { 
     merge_fastqs;
@@ -23,7 +23,18 @@ include {
 include { 
     demultiplex_orientation;
     demultiplex_bc;
-    demultiplex_library } from './modules/cutadapt'
+    demultiplex_library;
+    adapter_trim } from './modules/cutadapt'
+
+include {
+    extract_UMI;
+    dedup_UMI } from './modules/umi_tools'
+
+include { STAR_ALIGN } from './modules/star'
+
+include { BAM_INDEX } from './modules/samtools'
+
+include { featureCounts } from './modules/subread'
 
 // function definitions
 def getPrefix(file) {
@@ -39,6 +50,9 @@ Channel
     .fromPath(params.fast5_dir, type: 'dir')
     .set{fast5_dir}
 Channel
+    .fromPath(params.index_dir, type: 'dir')
+    .set{index_dir}
+Channel
     .fromPath("${params.fastq_dir}/merged_*.fastq.gz")
     .set{fastq_file}
 Channel
@@ -50,6 +64,9 @@ Channel
 Channel
     .value(params.multiqc_config)
     .set{multiqc_config}
+Channel
+    .value(params.saf_file)
+    .set{saf_file}
 
 // config files
 Channel
@@ -65,10 +82,15 @@ Channel
     .from([params.rv_fp_P3_1, params.rv_tp_P5_1])
     .collect()
     .set{rv_adapters}
+Channel
+    .from([params.fw_P5_2, params.fw_P3_2])
+    .collect()
+    .set{internal_adapters}
 
 prefix = fast5_files.map{ it -> getPrefix(it)}.first()
 
 workflow {
+    /* ----- BASECALLING ----- */
     // fast5_files \
     // | basecall
     // merge_fastqs(prefix, basecall.out.collect())
@@ -77,9 +99,11 @@ workflow {
     raw_fastqc(fastq_file)
     fastqc_logs = raw_fastqc.out
     
-    /* 
-    - P5 and P3 adapter trimming
-    - orientation guess (forward or reverse) based demultiplexing
+    /* ----- ORIENTATION DEMULTIPLEXING ----- */
+    /*
+    - demultiplex fw and rv reads based on orientation
+    - remove P5 and P3 adapters
+    - QC on demultiplexed files
     */
     demultiplex_orientation(
         fw_adapters,
@@ -89,9 +113,8 @@ workflow {
 
     dmplx_orient_logs = demultiplex_orientation.out.log
 
-    /* QC on demultiplexed files */
     demultiplex_orientation.out.trimmed_fastqs \
-    | trimmed_fastqc
+    | oriented_fastqc
     
     orientation_stats(
         demultiplex_orientation.out.trimmed_fastqs,
@@ -99,10 +122,11 @@ workflow {
     )
 
     fastqc_logs = fastqc_logs
-        .concat(trimmed_fastqc.out)
+        .concat(oriented_fastqc.out)
         .collect()  // makes multiqc wait for all to be emitted
 
-    /* REVERSE COMPLEMENT OF TRIMMED READS
+    /* ----- REVERSE COMPLEMENT OF TRIMMED READS ----- */
+    /*
     - merge fw_R1 and rv_R2 into final_R1
     - discard fw_R2, rv_R1 and unknown
     */
@@ -129,28 +153,58 @@ workflow {
         "library_dmplexed"
     )
 
-    dmplx_lib_logs = demultiplex_library.out.log
+    dmplx_lib_logs = demultiplex_library.out.log.collect()
+
+    // prepare the channel for the next step
+    demultiplex_library.out.fastqs \
+    | flatten \
+    | filter { it.simpleName =~ /^(?!pool_unknown).*$/ } \
+    | set {lib_dmplexed_fastqs}
 
     /* INTERNAL ADAPTER TRIMMING */
+    adapter_trim(
+        lib_dmplexed_fastqs,
+        internal_adapters
+    )
+
+    adapter_trim_logs = adapter_trim.out.log.collect()
     
     /* BARCODE DEMULTIPLEXING */
-    // demultiplex_bc(
-    //     reverse_complement.out,
-    //     bc_csv
-    // )
+    demultiplex_bc(
+        adapter_trim.out.fastqs,
+        bc_csv
+    )
 
-    // bc_stats(
-    //     demultiplex_bc.out.fastqs,
-    //     "demultiplexed"
-    // )
+    bc_demultiplex_logs = demultiplex_bc.out.log
 
-    // bc_demultiplex_logs = demultiplex_bc.out.log
+    bc_stats(
+        demultiplex_bc.out.fastqs.collect(),
+        "bc_dmplexed"
+    )
 
     // extract UMI
+    demultiplex_bc.out.fastqs \
+    | flatten \
+    | extract_UMI
 
-    // map to reference
+    // read alignment
+    STAR_ALIGN(extract_UMI.out, index_dir)
 
-    // deduplicate
+    alignment_multiqc = STAR_ALIGN.out.logs.collect()
+
+    // deduplication of aligned bams
+    STAR_ALIGN.out.bams \
+    | dedup_UMI
+    
+    dedup_multiqc = dedup_UMI.out.logs.collect()
+    
+    // reindexing of bams for IGV
+    dedup_UMI.out.dedup_bams \
+    | BAM_INDEX
+
+    // expression quantification
+    featureCounts(dedup_UMI.out.dedup_bams.collect(), saf_file) 
+    featureCounts_multiqc = featureCounts.out.logs.collect()
 
     // multiqc
     multiqc(

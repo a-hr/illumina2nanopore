@@ -3,7 +3,6 @@
 import argparse
 import os
 import sys
-import re
 from pathlib import Path
 
 import pandas as pd
