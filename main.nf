@@ -133,7 +133,7 @@ workflow {
 
     demultiplex_orientation.out.trimmed_fastqs \
     | flatten \
-    | filter { it =~ /^((?!.*(unknown).*).)*$/ } \
+    | filter { it.simpleName =~ /^((?!.*(unknown).*).)*$/ } \
     | reverse_complement
 
     if (params.merge_all_fw) {
@@ -167,7 +167,7 @@ workflow {
     // prepare the channel for the next step
     demultiplex_library.out.fastqs \
     | flatten \
-    | filter { it.simpleName =~ /^.*(?!unknown).*$/ } \
+    | filter { it.simpleName =~ /^((?!.*(unknown).*).)*$/ } \
     | set {lib_dmplexed_fastqs}
 
     /* INTERNAL ADAPTER TRIMMING */
@@ -194,6 +194,7 @@ workflow {
     // extract UMI
     demultiplex_bc.out.fastqs \
     | flatten \
+    | filter { it.simpleName =~ /^((?!.*(unknown).*).)*$/ } \
     | extract_UMI
 
     // read alignment
