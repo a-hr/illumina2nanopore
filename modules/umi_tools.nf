@@ -8,10 +8,11 @@ process extract_UMI {
     input:
         path fastq
     output:
-        path "*_UMI.*"
+        path "UMI_$fastq"
     
+    script:
     """
-    umi.py -m extract -I $fastq
+    umi_tools extract --bc-pattern=NNNNNN -I $fastq -S UMI_${fastq}
     """
 }
 
@@ -20,19 +21,18 @@ process dedup_UMI {
     tag "$bam"
     publishDir "${params.output_dir}/bams",
         mode: 'copy',
-        pattern: "dedup_*",
+        pattern: "dedup_$bam",
         enabled: params.publish_mapped
 
     input:
         path bam
     output:
-        path "dedup_*", emit: dedup_bams
-        path "${logname}.log", emit: logs
+        path "dedup_$bam", emit: dedup_bams
+        path "${bam.simpleName}.log", emit: logs
     
     script:
-    logname = bam.simpleName
     """
     samtools index $bam
-    umi_tools dedup -I $bam -S dedup_$bam > ${logname}.log
+    umi_tools dedup -I $bam -S dedup_$bam > ${bam.simpleName}.log
     """
 }
