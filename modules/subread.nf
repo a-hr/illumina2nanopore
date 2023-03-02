@@ -2,17 +2,21 @@ process featureCounts {
     label 'process_low'
     publishDir "${params.output_dir}",
         mode: 'copy',
-        pattern: "*.txt"
+        pattern: "*.tsv"
 
     input:
-        path bams
+        path dedup_bams
+        path raw_bams
         path saf_file
     output:
-        path "counts.txt", emit: counts
+        path "*.tsv", emit: counts
         path "*.summary", emit: logs
 
     """
-    featureCounts -a ${saf_file} -o counts.txt $bams -F 'SAF'
-    sed -i '1d ; 2 s/dedup_//g ; 2 s/_UMIAligned.sortedByCoord.out.bam//g' counts.txt
+    featureCounts -a ${saf_file} -o dedup_counts.tsv $dedup_bams -F 'SAF'
+    sed -i '1d ; 2 s/dedup_//g ; 2 s/Aligned.sortedByCoord.out.bam//g' dedup_counts.tsv
+
+    featureCounts -a ${saf_file} -o raw_counts.tsv $raw_bams -F 'SAF'
+    sed -i '1d ; 2 s/Aligned.sortedByCoord.out.bam//g' raw_counts.tsv
     """
 }
