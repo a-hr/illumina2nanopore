@@ -12,7 +12,7 @@ csv_file: "${baseDir}/inputs/csvs/barcodes.csv"
 bc_csv: "${baseDir}/inputs/csvs/barcodes.csv" # csv file containing the barcodes
 lib_csv: "${baseDir}/inputs/csvs/libraries.csv" # csv containing library barcodes (i7)
 saf_file: "${baseDir}/inputs/csvs/annotations.saf"
-index_dir: "${baseDir}/index"
+index_dir: "/scratch/blazquL/indexes/m_index/index_m99"
 
 # ---- basecalling config ----
 config_file: "dna_r9.4.1_450bps_hac.cfg" # kit and flowcell configuration file
@@ -37,8 +37,8 @@ publish_merged_complemented: false
 publish_lib_demultiplexed: false
 publish_trimmed: false
 publish_bc_demultiplexed: false
-publish_UMI_extracted: true
-publish_mapped: false
+publish_UMI_extracted: false
+publish_mapped: true
 
 # ---- other config ----
 multiqc_config: "${baseDir}/assets/multiqc_config.yaml" # multiqc config file

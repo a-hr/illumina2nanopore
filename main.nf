@@ -50,7 +50,7 @@ Channel
     .fromPath(params.fast5_dir, type: 'dir')
     .set{fast5_dir}
 Channel
-    .fromPath(params.index_dir, type: 'dir')
+    .value(params.index_dir)
     .set{index_dir}
 Channel
     .fromPath("${params.fastq_dir}/merged_*.fastq.gz")

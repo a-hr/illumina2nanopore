@@ -13,6 +13,6 @@ process featureCounts {
 
     """
     featureCounts -a ${saf_file} -o counts.txt $bams -F 'SAF'
-    sed -i '1d ; 2 s/dedup_//g ; 2 s/.sortedByCoord.out.bam//g' counts.txt
+    sed -i '1d ; 2 s/dedup_//g ; 2 s/_UMIAligned.sortedByCoord.out.bam//g' counts.txt
     """
 }
