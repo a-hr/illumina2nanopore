@@ -42,9 +42,10 @@ def demultiplex(bc_csv: Path, fastq: Path) -> None:
     ]
     bcs = " -a ".join(bcs)  # anchored 3' adapters
 
-    lib_name = fastq.name.split("_")[2].split(".")[0]
+    # input example = "trimmed_forward_libN.fastq.gz" 
+    prefix = fastq.name.split(".")[0].removeprefix("trimmed_") # forward_libN
 
-    cmd = f"""cutadapt -e 0.2 --no-indels -j 0 -a {bcs} -o pool_{lib_name}_{{name}}.fastq.gz {fastq.name}"""
+    cmd = f"""cutadapt -e 0.2 --no-indels -j 0 -a {bcs} -o {prefix}_{{name}}.fastq.gz {fastq}"""
     os.system(cmd)
 
 

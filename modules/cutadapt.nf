@@ -49,7 +49,7 @@ process demultiplex_library {
 }
 
 process demultiplex_bc {
-    tag { prefix }
+    tag { fastq.name }
 
     publishDir "${params.output_dir}/fastqs/bc_demultiplexed",
         mode: 'copy',

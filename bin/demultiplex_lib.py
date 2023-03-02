@@ -39,8 +39,11 @@ def demultiplex(bc_csv: Path, f1: Path) -> None:
         for row in bc_csv.iterrows()
     ]
     bcs = " -a ".join(bcs)  # 3' anchored i7 barcodes
+    
+    # input file name example = "forward_R1.fastq.gz"
+    pref = f1.name.split(".")[0].split("_")[0] # forward/reverse 
 
-    cmd = f"""cutadapt -e 0.2 --no-indels -j 0 -a {bcs} -o pool_{{name}}.fastq.gz {f1}"""
+    cmd = f"""cutadapt -e 0.2 --no-indels -j 0 -a {bcs} -o {pref}_{{name}}.fastq.gz {f1}"""
     os.system(cmd)
 
 
