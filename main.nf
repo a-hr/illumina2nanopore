@@ -136,20 +136,29 @@ workflow {
     | filter { it =~ /^((?!.*(unknown).*).)*$/ } \
     | reverse_complement
 
-    reverse_complement.out \
-    | flatten \
-    | filter { it.name =~ /^(forward_R1|reverse_R2)\.fastq.gz$/ } \
-    | collect \
-    | merge_forward_reverse
+    if (params.merge_all_fw) {
+        reverse_complement.out \
+            | flatten \
+            | filter { it.name =~ /^(forward_R1|reverse_R2)\.fastq.gz$/ } \
+            | collect \
+            | merge_forward_reverse \
+            | set { complemented_fastqs }
+    }
+    else {
+        reverse_complement.out \
+            | flatten \
+            | filter { it.name =~ /^(forward_R1|reverse_R2)\.fastq.gz$/ } \
+            | set { complemented_fastqs }
+    }
     
     /* LIBRARY DEMULTIPLEXING */
     demultiplex_library(
-        merge_forward_reverse.out,
+        complemented_fastqs,
         lib_csv
     )
 
     lib_stats(
-        demultiplex_library.out.fastqs,
+        demultiplex_library.out.fastqs.collect(),
         "library_dmplexed"
     )
 
@@ -158,7 +167,7 @@ workflow {
     // prepare the channel for the next step
     demultiplex_library.out.fastqs \
     | flatten \
-    | filter { it.simpleName =~ /^(?!pool_unknown).*$/ } \
+    | filter { it.simpleName =~ /^.*(?!unknown).*$/ } \
     | set {lib_dmplexed_fastqs}
 
     /* INTERNAL ADAPTER TRIMMING */
@@ -203,7 +212,12 @@ workflow {
     | BAM_INDEX
 
     // expression quantification
-    featureCounts(dedup_UMI.out.dedup_bams.collect(), saf_file) 
+    featureCounts(
+        dedup_UMI.out.dedup_bams.collect(),
+        STAR_ALIGN.out.bams.collect(),
+        saf_file
+    )
+    
     featureCounts_multiqc = featureCounts.out.logs.collect()
 
     // multiqc

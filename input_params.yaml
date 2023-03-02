@@ -42,3 +42,4 @@ publish_mapped: true
 
 # ---- other config ----
 multiqc_config: "${baseDir}/assets/multiqc_config.yaml" # multiqc config file
+merge_all_fw: false
