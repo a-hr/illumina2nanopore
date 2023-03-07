@@ -3,8 +3,15 @@ process multiqc {
 
     input:
         path fastqc_log
-        path demultiplex_log
+        path demultiplex_orientation_log
+        path demultiplex_library_log
+        path adapter_trim_log
+        path demultiplex_barcode_log
+        path star_align_log
+        path dedup_log
+        path featureCounts_log
         path multiqc_custom_config
+
     output:
         path "multiqc_report.html"
 

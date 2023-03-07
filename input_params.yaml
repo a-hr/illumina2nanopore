@@ -15,7 +15,7 @@ saf_file: "${baseDir}/inputs/csvs/annotations.saf"
 index_dir: "/scratch/blazquL/indexes/m_index/index_m99"
 
 # ---- basecalling config ----
-config_file: "dna_r9.4.1_450bps_hac.cfg" # kit and flowcell configuration file
+config_file: "dna_r9.4.1_450bps_sup.cfg" # kit and flowcell configuration file
 
 # ---- trimming config ----
 five_prime_fw: "AATGATACGGCGACCACCGAGATCTACACTCTTTCCCTA"
@@ -29,8 +29,7 @@ fw_P3_2: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC"
 # ---- alignment config ----
 
 # ---- result publish config ----
-publish_basecalled: false
-publish_merged: false
+publish_basecalled: true
 publish_orient_demultiplexed: false
 publish_complemented: false
 publish_merged_complemented: false

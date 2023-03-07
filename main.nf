@@ -18,6 +18,7 @@ include {
     stats as orientation_stats;
     stats as lib_stats;
     stats as bc_stats;
+    stats as trim_stats;
     reverse_complement} from './modules/seqkit'
 
 include { 
@@ -34,7 +35,9 @@ include { STAR_ALIGN } from './modules/star'
 
 include { BAM_INDEX } from './modules/samtools'
 
-include { featureCounts } from './modules/subread'
+include { 
+    featureCounts as fw_featureCounts;
+    featureCounts as rv_featureCounts } from './modules/subread'
 
 // function definitions
 def getPrefix(file) {
@@ -43,18 +46,18 @@ def getPrefix(file) {
 
 // ------------ VARIABLES ------------
 // paths
-Channel
-    .fromPath("${params.fast5_dir}/*.fast5")
-    .set{fast5_files}
+// Channel
+//     .fromPath("${params.fast5_dir}/*.fast5")
+//     .set{fast5_files}
 Channel
     .fromPath(params.fast5_dir, type: 'dir')
     .set{fast5_dir}
 Channel
     .value(params.index_dir)
     .set{index_dir}
-Channel
-    .fromPath("${params.fastq_dir}/merged_*.fastq.gz")
-    .set{fastq_file}
+// Channel
+//     .fromPath("${params.fastq_dir}/merged_*.fastq.gz")
+//     .set{fastq_file}
 Channel
     .value(params.bc_csv)
     .set{bc_csv}
@@ -87,13 +90,20 @@ Channel
     .collect()
     .set{internal_adapters}
 
-prefix = fast5_files.map{ it -> getPrefix(it)}.first()
+// prefix = fast5_files.map{ it -> getPrefix(it)}.first()
 
 workflow {
     /* ----- BASECALLING ----- */
     // fast5_files \
     // | basecall
-    // merge_fastqs(prefix, basecall.out.collect())
+    // merge_fastqs(prefix, basecall.out.collect()) \
+    // | set {fastq_file}
+
+    fast5_dir \
+    | basecall \
+    | collect \
+    | merge_fastqs \
+    | set { fastq_file }
     
     // raw read QC
     raw_fastqc(fastq_file)
@@ -176,6 +186,11 @@ workflow {
         internal_adapters
     )
 
+    trim_stats(
+        adapter_trim.out.fastqs.collect(),
+        "adapter_trimmed"
+    )
+
     adapter_trim_logs = adapter_trim.out.log.collect()
     
     /* BARCODE DEMULTIPLEXING */
@@ -191,40 +206,69 @@ workflow {
         "bc_dmplexed"
     )
 
-    // extract UMI
+    /* EXTRACT UMI */
+
     demultiplex_bc.out.fastqs \
     | flatten \
     | filter { it.simpleName =~ /^((?!.*(unknown).*).)*$/ } \
     | extract_UMI
 
-    // read alignment
+    /* ALIGNMENT */
     STAR_ALIGN(extract_UMI.out, index_dir)
 
     alignment_multiqc = STAR_ALIGN.out.logs.collect()
 
-    // deduplication of aligned bams
+    /* DEDUPLICATION OF READS */
     STAR_ALIGN.out.bams \
     | dedup_UMI
     
     dedup_multiqc = dedup_UMI.out.logs.collect()
     
-    // reindexing of bams for IGV
+    /* BAM INDEXING */
     dedup_UMI.out.dedup_bams \
     | BAM_INDEX
 
-    // expression quantification
-    featureCounts(
-        dedup_UMI.out.dedup_bams.collect(),
-        STAR_ALIGN.out.bams.collect(),
+    /* EXPRESSION QUANTIFICATION */
+
+    // separate bams into forward and reverse
+    dedup_UMI.out.dedup_bams \
+    | branch {
+        forward: it.name =~ /.*forward.*/
+        reverse: it.name =~ /.*reverse.*/
+    } \
+    | set {dedup_filt_bams}
+
+    STAR_ALIGN.out.bams \
+    | branch {
+        forward: it.name =~ /.*forward.*/
+        reverse: it.name =~ /.*reverse.*/
+    } \
+    | set {star_filt_bams}
+
+    fw_featureCounts(
+        dedup_filt_bams.forward.collect(),
+        star_filt_bams.forward.collect(),
+        saf_file
+    )
+
+    rv_featureCounts(
+        dedup_filt_bams.reverse.collect(),
+        star_filt_bams.reverse.collect(),
         saf_file
     )
     
-    featureCounts_multiqc = featureCounts.out.logs.collect()
+    featureCounts_multiqc = fw_featureCounts.out.logs.collect()
 
     // multiqc
     multiqc(
         fastqc_logs,
         dmplx_orient_logs,
+        dmplx_lib_logs,
+        adapter_trim_logs,
+        bc_demultiplex_logs,
+        alignment_multiqc,
+        dedup_multiqc,
+        featureCounts_multiqc,
         multiqc_config
     )
 
