@@ -6,11 +6,11 @@ process merge_fastqs {
     input:
         path fastqs
     output:
-        path "out/merged_*.fastq.gz"
+        path "out/merged.fastq.gz"
 
     """
     mkdir out
-    cat ${sample}*.fastq.gz > out/merged_${sample}.fastq.gz
+    cat *.fastq.gz > out/merged.fastq.gz
     """
 }
 

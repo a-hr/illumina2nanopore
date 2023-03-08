@@ -20,8 +20,6 @@ process demultiplex_orientation {
         -a forward="${five_prime_fw}...${three_prime_fw}" \\
         -a reverse="${five_prime_rv}...${three_prime_rv}" \\
         -e 0.2 \\
-        -m 193 \\
-        -M 224 \\
         -o {name}.fastq.gz \\
         ${fastq_file} > ${fastq_file.simpleName}_orient_dmplex.log
     """
@@ -90,9 +88,8 @@ process adapter_trim {
         -j 0 \\
         -e 0.2 \\
         --no-indels \\
-        --discard-untrimmed \\
         -g ${five_prime}...${three_prime} \\
         -o trimmed_${fastq} \\
-        ${fastq} > adapter_trim.log
+        ${fastq} > adapter_trim_${fastq.name}.log
     """
 }

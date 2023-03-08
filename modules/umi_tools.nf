@@ -30,7 +30,6 @@ process dedup_UMI {
         path "dedup_$bam", emit: dedup_bams
         path "${bam.simpleName}.log", emit: logs
     
-    script:
     """
     samtools index $bam
     umi_tools dedup -I $bam -S dedup_$bam > ${bam.simpleName}.log
