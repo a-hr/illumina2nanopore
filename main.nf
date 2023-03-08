@@ -45,19 +45,25 @@ def getPrefix(file) {
 }
 
 // ------------ VARIABLES ------------
+
 // paths
-// Channel
-//     .fromPath("${params.fast5_dir}/*.fast5")
-//     .set{fast5_files}
-Channel
-    .fromPath(params.fast5_dir, type: 'dir')
-    .set{fast5_dir}
+if (params.basecall) {
+    Channel
+        .fromPath("${params.fast5_dir}/*.fast5")
+        .set{fast5_files}
+    Channel
+        .fromPath(params.fast5_dir, type: 'dir')
+        .set{fast5_dir}
+}
+else {
+    Channel
+        .fromPath("$params.fastq_dir/*.fastq.gz")
+        .set {fastq_file}
+}
+
 Channel
     .value(params.index_dir)
     .set{index_dir}
-// Channel
-//     .fromPath("${params.fastq_dir}/merged_*.fastq.gz")
-//     .set{fastq_file}
 Channel
     .value(params.bc_csv)
     .set{bc_csv}
@@ -90,20 +96,18 @@ Channel
     .collect()
     .set{internal_adapters}
 
-// prefix = fast5_files.map{ it -> getPrefix(it)}.first()
-
 workflow {
     /* ----- BASECALLING ----- */
-    // fast5_files \
-    // | basecall
-    // merge_fastqs(prefix, basecall.out.collect()) \
-    // | set {fastq_file}
 
-    fast5_dir \
-    | basecall \
-    | collect \
-    | merge_fastqs \
-    | set { fastq_file }
+    if (params.basecall) {
+        prefix = fast5_files.map{ it -> getPrefix(it)}.first()
+
+        fast5_dir \
+        | basecall \
+        | collect \
+        | merge_fastqs \
+        | set { fastq_file }
+    }
     
     // raw read QC
     raw_fastqc(fastq_file)
