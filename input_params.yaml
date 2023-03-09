@@ -26,6 +26,8 @@ three_prime_rv: "TAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT"
 fw_P5_2: "CACGACGCTCTTCCGATCT"
 fw_P3_2: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC"
 
+min_len: 150
+max_len: 350
 # ---- alignment config ----
 
 # ---- result publish config ----
