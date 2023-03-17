@@ -42,6 +42,7 @@ publish_UMI_extracted: false
 publish_mapped: true
 
 # ---- other config ----
+run_name: "feb23_mHTT" # name of the run, used for naming files and logs
 multiqc_config: "${baseDir}/assets/multiqc_config.yaml" # multiqc config file
 merge_all_fw: false
 basecall: false

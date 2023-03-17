@@ -96,6 +96,22 @@ Channel
     .collect()
     .set{internal_adapters}
 
+// create a log with the input parameters and csv files
+// log_params = Channel
+//     .fromPath(params.config)
+//     .map{ it -> it.text() }
+//     .collect()
+//     .map{ it -> it.join("\n") } 
+// input_csvs = Channel
+//     .fromPath("$params.csv_dir/*")
+//     .map{ it -> it.text() }
+//     .collect()
+//     .map{ it -> it.join("\n") } 
+
+// // create log file with log_params and input_csvs and save it to the output directory
+// log_params
+//     .combine(input_csvs)
+
 workflow {
     /* ----- BASECALLING ----- */
 
@@ -252,13 +268,15 @@ workflow {
     fw_featureCounts(
         dedup_filt_bams.forward.collect(),
         star_filt_bams.forward.collect(),
-        saf_file
+        saf_file,
+        "forward"
     )
 
     rv_featureCounts(
         dedup_filt_bams.reverse.collect(),
         star_filt_bams.reverse.collect(),
-        saf_file
+        saf_file,
+        "reverse"
     )
     
     featureCounts_multiqc = fw_featureCounts.out.logs.collect()
