@@ -1,38 +1,56 @@
-# Use this template to pass your parameters to Nextflow.
+# -------- BASIC CONFIG --------
+run_name: "ane_rubio_21_03"
+output: "${baseDir}/"
 
-# TIP: use $baseDir to refer to the directory where main.nf is located
-# You can also use full paths instead  
+# -------- INPUT FASTQ --------
+fastq_dir: "${baseDir}/inputs/fastq"
 
-run_name: "march_23_mHTT" # name of the run, used for naming files and logs
+# -------- BASECALLING --------
+enable_basecalling: false
+enable_gpu: false
 
-# ---- required paths ----
-fast5_dir: "${baseDir}/inputs/fast5" # folder containing the fastq files
-fastq_dir: "${baseDir}/inputs/fastq" # folder containing the fastq files
-output: "${baseDir}" # where the output will be stored (creates a folder with the run name)
+fast5_dir: "${baseDir}/inputs"
+config_file: "dna_r9.4.1_450bps_sup.cfg"
 
-csv_file: "${baseDir}/inputs/csvs/barcodes.csv" 
-bc_csv: "${baseDir}/inputs/csvs/barcodes.csv" # csv file containing the barcodes
-lib_csv: "${baseDir}/inputs/csvs/libraries.csv" # csv containing library barcodes (i7)
+# -------- ORIENTATION DEMULTIPLEXING --------
+enable_orientation_demultiplexing: true
+
+fw_fp_P5_1: "AATGATACGGCGACCACCGAGATCTACACGTTCAG" 
+fw_tp_P3_1: "ATCTCGTATGCCGTCTTCTGCTTG"
+rv_fp_P3_1: "CAAGCAGAAGACGGCATACGAGAT"
+rv_tp_P5_1: "CTGAACGTGTAGATCTCGGTGGTCGCCGTATCATT"
+
+# -------- LIBRARY DEMULTIPLEXING --------
+enable_library_demultiplexing: true
+lib_csv: "${baseDir}/inputs/csvs/libraries.csv"
+
+# --------  TRIMMING --------
+fw_P5_2: "AGTTCTACAGTCCGACGATC"
+fw_P3_2: "TGGAATTCTCGGGTGCCAAGGAACTCCAGTCAC"
+
+min_length: 0
+max_length: 999999
+
+# -------- BARCODE DEMULTIPLEXING --------
+enable_barcode_demultiplexing: false
+bc_csv: "${baseDir}/inputs/csvs/barcodes.csv"
+
+# -------- UMI CLUSTERING --------
+enable_UMI_treatment: false
+enable_UMI_clustering: false
+
+UMI_length: 6  # todo: implement in the pipeline
+
+# -------- ALIGNING --------
+enable_shared_memory: false
+index_dir: "/scratch/blazquL/indexes/h_index/index_h99/star_index"
+
+# -------- FEATURE COUNTING --------
+enable_isoform_counting: false
 saf_file: "${baseDir}/inputs/csvs/annotations.saf"
-index_dir: "/scratch/blazquL/indexes/m_index/index_m99"
+gtf_file: "/scratch/blazquL/indexes/h_index/gencode.v41.primary_assembly.annotation.gtf"
 
-# ---- basecalling config ----
-config_file: "dna_r9.4.1_450bps_sup.cfg" # kit and flowcell configuration file
-
-# ---- trimming config ----
-five_prime_fw: "AATGATACGGCGACCACCGAGATCTACACTCTTTCCCTA"
-three_prime_fw: "ATCTCGTATGCCGTCTTCTGCTTG"
-five_prime_rv: "CAAGCAGAAGACGGCATACGAGAT"
-three_prime_rv: "TAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT"
-
-fw_P5_2: "CACGACGCTCTTCCGATCT"
-fw_P3_2: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC"
-
-min_len: 150
-max_len: 350
-# ---- alignment config ----
-
-# ---- result publish config ----
+# -------- RETRIEVING INTERMEDIATE FILES --------
 publish_basecalled: false
 publish_orient_demultiplexed: false
 publish_complemented: false
@@ -43,7 +61,6 @@ publish_bc_demultiplexed: false
 publish_UMI_extracted: false
 publish_mapped: true
 
-# ---- other config ----
-multiqc_config: "${baseDir}/assets/multiqc_config.yaml" # multiqc config file
-merge_all_fw: false
-basecall: false
+# -------- OTHER CONFIGS --------
+multiqc_config: "${baseDir}/assets/multiqc_config.yaml"
+clean_up: false

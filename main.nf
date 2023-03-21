@@ -1,7 +1,8 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
-// include modules
+// ------------ MODULES ------------
+
 include { basecall } from './modules/basecall'
 
 include { 
@@ -36,18 +37,20 @@ include { STAR_ALIGN } from './modules/star'
 include { BAM_INDEX } from './modules/samtools'
 
 include { 
-    featureCounts as fw_featureCounts;
-    featureCounts as rv_featureCounts } from './modules/subread'
+    featureCounts as dup_featureCounts;
+    featureCounts as dedup_featureCounts } from './modules/subread'
 
-// function definitions
+
+// ------------ FUNCTIONS ------------
+
 def getPrefix(file) {
     return (file.name =~ /(.*)_[0-9]{1,10}\.fast5/)[0][1]
 }
 
-// ------------ VARIABLES ------------
 
-// paths
-if (params.basecall) {
+// ------------ INPUT FILES ------------
+
+if (params.enable_basecalling) {
     Channel
         .fromPath("${params.fast5_dir}/*.fast5")
         .set{fast5_files}
@@ -55,11 +58,15 @@ if (params.basecall) {
         .fromPath(params.fast5_dir, type: 'dir')
         .set{fast5_dir}
 }
-else {
+
+if (!params.enable_isoform_counting) {
     Channel
-        .fromPath("$params.fastq_dir/*.fastq.gz")
-        .set {fastq_file}
+        .fromPath(params.gtf_file)
+        .set{gtf_file}
 }
+
+
+// ------------ RESOURCE FILES ------------
 
 Channel
     .value(params.index_dir)
@@ -77,12 +84,16 @@ Channel
     .value(params.saf_file)
     .set{saf_file}
 
-// config files
+
+// ------------ CONFIG FILES ------------
+
 Channel
     .fromPath(params.multiqc_config)
     .set{multiqc_config}
 
-// input parameters
+
+// ------------ INPUT PARAMETERS ------------
+
 Channel
     .from([params.fw_fp_P5_1, params.fw_tp_P3_1])
     .collect()
@@ -96,6 +107,8 @@ Channel
     .collect()
     .set{internal_adapters}
 
+
+// ------------ PIPELINE LOGGING ------------
 // create a log with the input parameters and csv files
 // log_params = Channel
 //     .fromPath(params.config)
@@ -115,7 +128,7 @@ Channel
 workflow {
     /* ----- BASECALLING ----- */
 
-    if (params.basecall) {
+    if (params.enable_basecalling) {
         prefix = fast5_files.map{ it -> getPrefix(it)}.first()
 
         fast5_dir \
@@ -123,6 +136,10 @@ workflow {
         | collect \
         | merge_fastqs \
         | set { fastq_file }
+    } else {
+        Channel
+            .fromPath("$params.fastq_dir/*.fastq.gz") \
+            | set { fastq_file }
     }
     
     // raw read QC
@@ -135,25 +152,36 @@ workflow {
     - remove P5 and P3 adapters
     - QC on demultiplexed files
     */
-    demultiplex_orientation(
-        fw_adapters,
-        rv_adapters,
-        fastq_file
-    )
+    if (params.enable_orientation_demultiplexing) {
 
-    dmplx_orient_logs = demultiplex_orientation.out.log
+        demultiplex_orientation(
+            fw_adapters,
+            rv_adapters,
+            fastq_file
+        )
 
-    demultiplex_orientation.out.trimmed_fastqs \
-    | oriented_fastqc
-    
-    orientation_stats(
-        demultiplex_orientation.out.trimmed_fastqs,
-        "orientation_dmplexed"
-    )
+        demultiplex_orientation.out.trimmed_fastqs \
+        | oriented_fastqc
+        
+        orientation_stats(
+            demultiplex_orientation.out.trimmed_fastqs,
+            "orientation_dmplexed"
+        )
 
-    fastqc_logs = fastqc_logs
-        .concat(oriented_fastqc.out)
-        .collect()  // makes multiqc wait for all to be emitted
+        fastqc_logs = fastqc_logs
+            .concat(oriented_fastqc.out)
+            .collect()  // makes multiqc wait for all to be emitted
+
+        // output channels
+        oriented_fastqs     = demultiplex_orientation.out.trimmed_fastqs
+        dmplx_orient_logs   = demultiplex_orientation.out.log
+
+    }
+    else {
+        // output channels
+        oriented_fastqs     = fastq_file
+        dmplx_orient_logs   = Channel.empty()
+    }
 
     /* ----- REVERSE COMPLEMENT OF TRIMMED READS ----- */
     /*
@@ -161,44 +189,47 @@ workflow {
     - discard fw_R2, rv_R1 and unknown
     */
 
-    demultiplex_orientation.out.trimmed_fastqs \
+    oriented_fastqs \
     | flatten \
     | filter { it.simpleName =~ /^((?!.*(unknown).*).)*$/ } \
     | reverse_complement
 
-    if (params.merge_all_fw) {
-        reverse_complement.out \
-            | flatten \
-            | filter { it.name =~ /^(forward_R1|reverse_R2)\.fastq.gz$/ } \
-            | collect \
-            | merge_forward_reverse \
-            | set { complemented_fastqs }
-    }
-    else {
-        reverse_complement.out \
-            | flatten \
-            | filter { it.name =~ /^(forward_R1|reverse_R2)\.fastq.gz$/ } \
-            | set { complemented_fastqs }
-    }
+    reverse_complement.out \
+    | flatten \
+    | filter { it.name =~ /^(forward_R1|reverse_R2)\.fastq.gz$/ } \
+    | collect \
+    | merge_forward_reverse \
+    | set { complemented_fastqs }
     
     /* LIBRARY DEMULTIPLEXING */
-    demultiplex_library(
-        complemented_fastqs,
-        lib_csv
-    )
 
-    lib_stats(
-        demultiplex_library.out.fastqs.collect(),
-        "library_dmplexed"
-    )
+    if (params.enable_library_demultiplexing) {
 
-    dmplx_lib_logs = demultiplex_library.out.log.collect()
+        demultiplex_library(
+            complemented_fastqs,
+            lib_csv
+        )
 
-    // prepare the channel for the next step
-    demultiplex_library.out.fastqs \
-    | flatten \
-    | filter { it.simpleName =~ /^((?!.*(unknown).*).)*$/ } \
-    | set {lib_dmplexed_fastqs}
+        lib_stats(
+            demultiplex_library.out.fastqs.collect(),
+            "library_dmplexed"
+        )
+
+        // output channels
+        demultiplex_library.out.fastqs \
+        | flatten \
+        | filter { it.simpleName =~ /^((?!.*(unknown).*).)*$/ } \
+        | set {lib_dmplexed_fastqs}
+
+        dmplx_lib_logs = demultiplex_library.out.log.collect()
+
+    }
+    else {
+        // output channels
+        lib_dmplexed_fastqs     = complemented_fastqs
+        dmplx_lib_logs          = Channel.empty()
+    }
+
 
     /* INTERNAL ADAPTER TRIMMING */
     adapter_trim(
@@ -214,84 +245,103 @@ workflow {
     adapter_trim_logs = adapter_trim.out.log.collect()
     
     /* BARCODE DEMULTIPLEXING */
-    demultiplex_bc(
-        adapter_trim.out.fastqs,
-        bc_csv
-    )
 
-    bc_demultiplex_logs = demultiplex_bc.out.log
+    if (params.enable_barcode_demultiplexing) {
 
-    bc_stats(
-        demultiplex_bc.out.fastqs.collect(),
-        "bc_dmplexed"
-    )
+        demultiplex_bc(
+            adapter_trim.out.fastqs,
+            bc_csv
+        )
+
+        bc_stats(
+            demultiplex_bc.out.fastqs.collect(),
+            "bc_dmplexed"
+        )
+
+        // output channels
+        bc_demultiplex_fastqs   = demultiplex_bc.out.fastqs
+        bc_demultiplex_logs     = demultiplex_bc.out.log
+
+    }
+    else {
+        // output channels
+        bc_demultiplex_fastqs   = adapter_trim.out.fastqs
+        bc_demultiplex_logs     = Channel.empty()
+    }
 
     /* EXTRACT UMI */
 
-    demultiplex_bc.out.fastqs \
-    | flatten \
-    | filter { it.simpleName =~ /^((?!.*(unknown).*).)*$/ } \
-    | extract_UMI
+    if (params.enable_UMI_treatment) {
+        bc_demultiplex_fastqs \
+        | flatten \
+        | filter { it.simpleName =~ /^((?!.*(unknown).*).)*$/ } \
+        | extract_UMI
+
+        // output channels
+        extracted_fastqs = extract_UMI.out
+    }
+    else {
+        // output channels
+        extracted_fastqs = bc_demultiplex_fastqs
+    }
 
     /* ALIGNMENT */
-    STAR_ALIGN(extract_UMI.out, index_dir)
+    STAR_ALIGN(extracted_fastqs, index_dir)
 
     alignment_multiqc = STAR_ALIGN.out.logs.collect()
 
     /* DEDUPLICATION OF READS */
-    STAR_ALIGN.out.bams \
-    | dedup_UMI
-    
-    dedup_multiqc = dedup_UMI.out.logs.collect()
-    
-    /* BAM INDEXING */
-    dedup_UMI.out.dedup_bams \
-    | BAM_INDEX
+
+    if (params.enable_UMI_treatment) {
+        STAR_ALIGN.out.bams \
+        | dedup_UMI
+
+        dedup_UMI.out.dedup_bams \
+        | BAM_INDEX
+
+        // output channels
+        dedup_bams      = dedup_UMI.out.dedup_bams
+        dedup_multiqc   = dedup_UMI.out.logs.collect()
+    }
+    else {
+        // output channels
+        dedup_bams      = Channel.empty()
+        dedup_multiqc   = Channel.empty()
+    }
 
     /* EXPRESSION QUANTIFICATION */
 
-    // separate bams into forward and reverse
-    dedup_UMI.out.dedup_bams \
-    | branch {
-        forward: it.name =~ /.*forward.*/
-        reverse: it.name =~ /.*reverse.*/
-    } \
-    | set {dedup_filt_bams}
-
-    STAR_ALIGN.out.bams \
-    | branch {
-        forward: it.name =~ /.*forward.*/
-        reverse: it.name =~ /.*reverse.*/
-    } \
-    | set {star_filt_bams}
-
-    fw_featureCounts(
-        dedup_filt_bams.forward.collect(),
-        star_filt_bams.forward.collect(),
+    dup_featureCounts(
+        STAR_ALIGN.out.bams.collect(),
         saf_file,
-        "forward"
+        "dup"
     )
 
-    rv_featureCounts(
-        dedup_filt_bams.reverse.collect(),
-        star_filt_bams.reverse.collect(),
-        saf_file,
-        "reverse"
-    )
-    
-    featureCounts_multiqc = fw_featureCounts.out.logs.collect()
+    dup_featureCounts_multiqc = dup_featureCounts.out.logs.collect()
+    dedup_featureCounts_multiqc = Channel.empty()
 
-    // multiqc
-    multiqc(
-        fastqc_logs,
-        dmplx_orient_logs,
-        dmplx_lib_logs,
-        adapter_trim_logs,
-        bc_demultiplex_logs,
-        alignment_multiqc,
-        dedup_multiqc,
-        featureCounts_multiqc,
-        multiqc_config
-    )
+    if (params.enable_UMI_treatment) {
+        dedup_featureCounts(
+            dedup_bams.collect(),
+            saf_file,
+            "dedup"
+        )
+
+        dedup_featureCounts_multiqc = dedup_featureCounts.out.logs.collect()
+
+    }    
+
+    // multiqc TODO: add input channels in modular way
+    // multiqc(
+    //     fastqc_logs,
+    //     dmplx_orient_logs,
+    //     dmplx_lib_logs,
+    //     adapter_trim_logs,
+    //     bc_demultiplex_logs,
+    //     alignment_multiqc,
+    //     dedup_multiqc,
+    //     featureCounts_multiqc,
+    //     multiqc_config
+    // )
 
 }
