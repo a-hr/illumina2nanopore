@@ -6,21 +6,24 @@ process featureCounts {
         pattern: "*.tsv"
 
     input:
-        path dedup_bams
-        path raw_bams
-        path saf_file
+        path bams
+        path annotations
         val prefix
     output:
         path "*.tsv", emit: counts
         path "*.summary", emit: logs
 
-    """
-    # deduplicated bams
-    featureCounts -a ${saf_file} -o ${prefix}_dedup_counts.tsv $dedup_bams -F 'SAF'
-    sed -i '1d ; 2 s/dedup_//g ; 2 s/Aligned.sortedByCoord.out.bam//g' ${prefix}_dedup_counts.tsv
-
-    # raw bams
-    featureCounts -a ${saf_file} -o ${prefix}_raw_counts.tsv $raw_bams -F 'SAF'
-    sed -i '1d ; 2 s/Aligned.sortedByCoord.out.bam//g' ${prefix}_raw_counts.tsv
-    """
+    script:
+    if (params.enable_isoform_counting) {
+        """
+        featureCounts -T ${task.cpus} -a ${annotations} -o ${prefix}_counts.tsv $bams -F 'SAF'
+        sed -i '1d ; 2 s/${prefix}_//g ; 2 s/Aligned.sortedByCoord.out.bam//g' ${prefix}_counts.tsv
+        """
+    }
+    else {
+        """
+        featureCounts -T ${task.cpus} -a ${annotations} -o ${prefix}_counts.tsv $bams
+        # sed -i '1d ; 2 s/${prefix}_//g ; 2 s/Aligned.sortedByCoord.out.bam//g' ${prefix}_dedup_counts.tsv
+        """
+    }
 }
