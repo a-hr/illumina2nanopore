@@ -10,7 +10,7 @@ inputs/*
 containers/*
 
 # project output and test files
-output/
+*output/
 test.nf
 error_logs/
 NOTES.md
