@@ -1,24 +1,6 @@
 # progreso
 
-## BASECALLERS
-
-* duplex basecalling: para secuenciar pair end con un solo flowcell
-    * basecaller Dorado (https://community.nanoporetech.com/docs/prepare/library_prep_protocols/Guppy-protocol/v/gpb_2003_v1_revap_14dec2018/duplex-basecalling)
-    * guppy_basecaller_duplex (incluido en guppy)
-
-# todo
-
-* parse and clean input names in csv files:
-    * remove double spaces
-    * replace spaces and underscores with dashes
-
-# error tracking
-* queueSize = 15, submitRateLimit = '1sec', pollInterval = '1m': error_count = 21
-* queueSize = 30, submitRateLimit = '1sec', pollInterval = '1m': error_count = 8
-* queueSize = 30, submitRateLimit = '1sec', pollInterval = '1m': error_count = 8
-
-
-# dudas
+5’_AATGATACGGCGACCACCGAGATCTACACGTTCAG-AGTTCTACAGTCCGACGATC-TARGET-TGGAATTCTCGGGTGCCAAGGAACTCCAGTCAC-i7index-ATCTCGTATGCCGTCTTCTGCTTG_3’
 
 # Input files
 
