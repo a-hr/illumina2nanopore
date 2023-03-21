@@ -20,8 +20,8 @@ process demultiplex_orientation {
         -a forward="${five_prime_fw}...${three_prime_fw}" \\
         -a reverse="${five_prime_rv}...${three_prime_rv}" \\
         -e 0.2 \\
-        -m ${params.min_len} \\
-        -M ${params.max_len} \\
+        -m ${params.min_length} \\
+        -M ${params.max_length} \\
         -o {name}.fastq.gz \\
         ${fastq_file} > ${fastq_file.simpleName}_orient_dmplex.log
     """
