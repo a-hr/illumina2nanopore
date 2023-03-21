@@ -25,9 +25,10 @@ process STAR_ALIGN {
         --limitBAMsortRAM 10000000000 \\
         --outFilterMultimapNmax 10 \\
         --outFilterMismatchNoverLmax 0.04 \\
-        --outFilterScoreMinOverLread 0.33 \\
-        --outFilterMatchNminOverLread 0.33 \\
+        --outFilterScoreMinOverLread 0.66 \\
+        --outFilterMatchNminOverLread 0.66 \\
         --alignEndsType Local \\
-        --outSAMattributes Standard 
+        --outSAMattributes Standard \\
+        ${params.enable_shared_memory ? '--genomeLoad LoadAndRemove' : ''} 
     """
 }
