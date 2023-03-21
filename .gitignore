@@ -13,4 +13,5 @@ containers/*
 *output/
 test.nf
 error_logs/
+old_params/
 NOTES.md
