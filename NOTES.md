@@ -29,3 +29,10 @@
 
 * Reads per FASTQ file (-q or --records_per_fastq): The number of reads to put in a single FASTQ file (see output format below). Set this to zero to output all reads into one file (per run id, per caller). The default value is 4000.
 * 
+
+# tools
+
+check corrupt fastqs:
+```bash
+zcat fastq.gz | paste - - - - | awk -F"\t" '{ if (length($2) != length($4)) print $0 }' |  tr '\t' '\n' > error_reads.fastq
+```

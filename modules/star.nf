@@ -12,7 +12,8 @@ process STAR_ALIGN {
 
     script:
     // remove UMI_ prefix from fastq file name
-    outName = fastq.simpleName.substring(4)
+    outName = fastq.simpleName - "UMI_"
+    outName = outName - "trimmed_final_"
     """
     STAR \\
         --runThreadN $task.cpus \\

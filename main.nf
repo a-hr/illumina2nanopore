@@ -34,6 +34,8 @@ include {
 
 include { STAR_ALIGN } from './modules/star'
 
+include { MINIMAP_ALIGN } from './modules/minimap'
+
 include { BAM_INDEX } from './modules/samtools'
 
 include { 
@@ -83,6 +85,9 @@ Channel
 Channel
     .value(params.saf_file)
     .set{saf_file}
+Channel
+    .value(params.ref_fasta)
+    .set{ref_fasta}
 
 
 // ------------ CONFIG FILES ------------
@@ -286,14 +291,25 @@ workflow {
     }
 
     /* ALIGNMENT */
-    STAR_ALIGN(extracted_fastqs, index_dir)
+    if (params.enable_minimap) {
+        MINIMAP_ALIGN(ref_fasta, extracted_fastqs)
 
-    alignment_multiqc = STAR_ALIGN.out.logs.collect()
+        // output channels
+        alignment_bams = MINIMAP_ALIGN.out
+    }
+    else {
+        STAR_ALIGN(extracted_fastqs, index_dir)
+
+        alignment_multiqc = STAR_ALIGN.out.logs.collect()
+
+        // output channels
+        alignment_bams = STAR_ALIGN.out.bams
+    }
 
     /* DEDUPLICATION OF READS */
 
     if (params.enable_UMI_treatment) {
-        STAR_ALIGN.out.bams \
+        alignment_bams \
         | dedup_UMI
 
         dedup_UMI.out.dedup_bams \
@@ -310,10 +326,10 @@ workflow {
     }
 
     /* EXPRESSION QUANTIFICATION */
-
+    annotations = params.enable_isoform_counting ? saf_file : gtf_file
     dup_featureCounts(
-        STAR_ALIGN.out.bams.collect(),
-        saf_file,
+        alignment_bams.collect(),
+        annotations,
         "dup"
     )
 
@@ -323,7 +339,7 @@ workflow {
     if (params.enable_UMI_treatment) {
         dedup_featureCounts(
             dedup_bams.collect(),
-            saf_file,
+            annotations,
             "dedup"
         )
 

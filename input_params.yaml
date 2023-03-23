@@ -1,6 +1,6 @@
 # -------- BASIC CONFIG --------
-run_name: "ane_rubio_21_03"
-output: "${baseDir}/"
+run_name: "ane_rubio_21_03_STAR"
+output_dir: "${baseDir}/ane_rubio_21_03_STAR_output"
 
 # -------- INPUT FASTQ --------
 fastq_dir: "${baseDir}/inputs/fastq"
@@ -28,8 +28,8 @@ lib_csv: "${baseDir}/inputs/csvs/libraries.csv"
 fw_P5_2: "AGTTCTACAGTCCGACGATC"
 fw_P3_2: "TGGAATTCTCGGGTGCCAAGGAACTCCAGTCAC"
 
-min_length: 0
-max_length: 999999
+min_length: 50
+max_length: 649
 
 # -------- BARCODE DEMULTIPLEXING --------
 enable_barcode_demultiplexing: false
@@ -45,10 +45,18 @@ UMI_length: 6  # todo: implement in the pipeline
 enable_shared_memory: false
 index_dir: "/scratch/blazquL/indexes/h_index/index_h99/star_index"
 
+# -------- MINIMAP --------
+enable_minimap: false
+ref_fasta: "/scratch/blazquL/indexes/h_index/GRCh38.primary_assembly.genome.fa" 
+
 # -------- FEATURE COUNTING --------
 enable_isoform_counting: false
+
 saf_file: "${baseDir}/inputs/csvs/annotations.saf"
 gtf_file: "/scratch/blazquL/indexes/h_index/gencode.v41.primary_assembly.annotation.gtf"
+
+multimapping_allowed: true
+fraction_allowed: true
 
 # -------- RETRIEVING INTERMEDIATE FILES --------
 publish_basecalled: false
