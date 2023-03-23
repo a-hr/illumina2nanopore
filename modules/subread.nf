@@ -14,16 +14,18 @@ process featureCounts {
         path "*.summary", emit: logs
 
     script:
+    def multimap = params.multimapping_allowed ? ' -M' : ''
+    def fraction = params.fraction_allowed ? ' --fraction' : ''
+
     if (params.enable_isoform_counting) {
         """
-        featureCounts -T ${task.cpus} -a ${annotations} -o ${prefix}_counts.tsv $bams -F 'SAF'
+        featureCounts -T ${task.cpus} ${multimap} ${fraction} -a ${annotations} -o ${prefix}_counts.tsv $bams -F 'SAF'
         sed -i '1d ; 2 s/${prefix}_//g ; 2 s/Aligned.sortedByCoord.out.bam//g' ${prefix}_counts.tsv
         """
     }
     else {
         """
-        featureCounts -T ${task.cpus} -a ${annotations} -o ${prefix}_counts.tsv $bams
-        # sed -i '1d ; 2 s/${prefix}_//g ; 2 s/Aligned.sortedByCoord.out.bam//g' ${prefix}_dedup_counts.tsv
+        featureCounts -T ${task.cpus} ${multimap} ${fraction} -a ${annotations} -o ${prefix}_counts.tsv $bams
         """
     }
 }
