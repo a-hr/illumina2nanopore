@@ -6,6 +6,7 @@ process MINIMAP_ALIGN {
         path "*.bam"
     
     """
-    minimap2 -x map-ont -a --sr -t ${task.cpus} $ref_fasta $fastq | samtools sort @ ${task.cpus}-o ${fastq.simpleName}.bam  
+    minimap2 -x map-ont -a --sr -t ${task.cpus} $ref_fasta $fastq -o ${fastq}.sam
+    samtools sort -@${task.cpus} -o ${fastq}.bam ${fastq}.sam
     """
 }
