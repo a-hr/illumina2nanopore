@@ -42,6 +42,8 @@ include {
     featureCounts as dup_featureCounts;
     featureCounts as dedup_featureCounts } from './modules/subread'
 
+include { plot_results; group_results } from './modules/visualization'
+
 
 // ------------ FUNCTIONS ------------
 
@@ -345,7 +347,25 @@ workflow {
 
         dedup_featureCounts_multiqc = dedup_featureCounts.out.logs.collect()
 
-    }    
+    }
+
+    /* RESULT CLEANING AND PLOTTING */
+    if (params.enable_UMI_treatment) {
+        dedup_featureCounts.out.counts \
+        | concat(dup_featureCounts.out.counts) \
+        | plot_counts
+
+        dedup_featureCounts.out.counts \
+        | concat(dup_featureCounts.out.counts) \
+        | group_counts
+    }
+    else {
+        dup_featureCounts.out.counts \
+        | plot_counts
+
+        dup_featureCounts.out.counts \
+        | group_counts
+    }
 
     // multiqc TODO: add input channels in modular way
     // multiqc(
