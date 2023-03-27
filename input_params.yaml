@@ -1,6 +1,6 @@
 # -------- BASIC CONFIG --------
-run_name: "ane_rubio_21_03_STAR"
-output_dir: "${baseDir}/ane_rubio_21_03_STAR_output"
+run_name: "ane_rubio_27_03_MINIMAP"
+output_dir: "${baseDir}/ane_rubio_27_03_STAR_output"
 
 # -------- INPUT FASTQ --------
 fastq_dir: "${baseDir}/inputs/fastq"
@@ -28,7 +28,7 @@ lib_csv: "${baseDir}/inputs/csvs/libraries.csv"
 fw_P5_2: "AGTTCTACAGTCCGACGATC"
 fw_P3_2: "TGGAATTCTCGGGTGCCAAGGAACTCCAGTCAC"
 
-min_length: 50
+min_length: 15
 max_length: 649
 
 # -------- BARCODE DEMULTIPLEXING --------
@@ -57,6 +57,18 @@ gtf_file: "/scratch/blazquL/indexes/h_index/gencode.v41.primary_assembly.annotat
 
 multimapping_allowed: true
 fraction_allowed: true
+
+# -------- RESULTS --------
+enable_grouping: false
+mouses: [WT, KI, YAC]
+tissues: [STR, CTX, HPC]
+
+enable_plotting: false
+libraries: []
+samples: [WT, KI, YAC]
+targets: [hHTT_PA1_v1, hHTT_PA2_v1, hHTT_cPA1_v1, hHTT_cPA2_v1, GRN]
+controls: [NTC, Neg]
+groups: 2
 
 # -------- RETRIEVING INTERMEDIATE FILES --------
 publish_basecalled: false
