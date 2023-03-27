@@ -1,9 +1,6 @@
 process featureCounts {
     tag "$prefix"
     label 'process_low'
-    publishDir "${params.output_dir}",
-        mode: 'copy',
-        pattern: "*.tsv"
 
     input:
         path bams
@@ -26,6 +23,7 @@ process featureCounts {
     else {
         """
         featureCounts -T ${task.cpus} ${multimap} ${fraction} -a ${annotations} -o ${prefix}_counts.tsv $bams
+        sed -i '1d' ${prefix}_counts.tsv
         """
     }
 }
