@@ -1,6 +1,10 @@
 process STAR_ALIGN {
     label 'process_max'
     tag "$fastq"
+    publishDir "${params.output_dir}/bams",
+        mode: 'copy',
+        pattern: "*.bam",
+        enabled: { params.enable_UMI_treatment ? false : params.publish_mapped }
 
     input:
         path fastq
