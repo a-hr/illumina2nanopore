@@ -19,10 +19,6 @@ process extract_UMI {
 process dedup_UMI {
     label 'process_low'
     tag "$bam"
-    publishDir "${params.output_dir}/bams",
-        mode: 'copy',
-        pattern: "dedup_$bam",
-        enabled: params.publish_mapped
 
     input:
         path bam

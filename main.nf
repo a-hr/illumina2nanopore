@@ -322,6 +322,9 @@ workflow {
         dedup_multiqc   = dedup_UMI.out.logs.collect()
     }
     else {
+        alignment_bams \
+        | BAM_INDEX
+        
         // output channels
         dedup_bams      = Channel.empty()
         dedup_multiqc   = Channel.empty()
@@ -351,20 +354,20 @@ workflow {
 
     /* RESULT CLEANING AND PLOTTING */
     if (params.enable_UMI_treatment) {
-        dedup_featureCounts.out.counts \
-        | concat(dup_featureCounts.out.counts) \
-        | plot_counts
+        dedup_featureCounts.out.counts.collect() \
+        | concat(dup_featureCounts.out.counts.collect()) \
+        | plot_results
 
-        dedup_featureCounts.out.counts \
-        | concat(dup_featureCounts.out.counts) \
-        | group_counts
+        dedup_featureCounts.out.counts.collect() \
+        | concat(dup_featureCounts.out.counts.collect()) \
+        | group_results
     }
     else {
-        dup_featureCounts.out.counts \
-        | plot_counts
+        dup_featureCounts.out.counts.collect() \
+        | plot_results
 
-        dup_featureCounts.out.counts \
-        | group_counts
+        dup_featureCounts.out.counts.collect() \
+        | group_results
     }
 
     // multiqc TODO: add input channels in modular way

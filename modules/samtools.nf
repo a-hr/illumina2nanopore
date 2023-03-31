@@ -8,6 +8,7 @@ process BAM_INDEX {
     input:
         path bam
     output:
+        path "*.bam", includeInputs: true
         path "*.bai"
     when:
         params.publish_mapped == true
