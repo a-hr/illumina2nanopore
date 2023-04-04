@@ -52,6 +52,30 @@ def getPrefix(file) {
 }
 
 
+// ------------ LOGGING ------------
+
+// copy the files in params.csv_dir to the output directory
+process input_logger {
+    publishDir "${params.output_dir}/input_logs", mode: 'copy'
+
+    input:
+        path lib_csv
+        path bc_csv
+        path saf
+        path input_params
+        path fastq_dir  // can be either fastq_dir or fast5_dir
+
+    output:
+        path "*.txt"
+        path "*.csv", includeInputs: true
+        path "*.yaml", includeInputs: true
+    
+    """
+    ls $fastq_dir > input_files.txt
+    """
+}
+
+
 // ------------ INPUT FILES ------------
 
 if (params.enable_basecalling) {
@@ -115,26 +139,17 @@ Channel
     .set{internal_adapters}
 
 
-// ------------ PIPELINE LOGGING ------------
-// create a log with the input parameters and csv files
-// log_params = Channel
-//     .fromPath(params.config)
-//     .map{ it -> it.text() }
-//     .collect()
-//     .map{ it -> it.join("\n") } 
-// input_csvs = Channel
-//     .fromPath("$params.csv_dir/*")
-//     .map{ it -> it.text() }
-//     .collect()
-//     .map{ it -> it.join("\n") } 
-
-// // create log file with log_params and input_csvs and save it to the output directory
-// log_params
-//     .combine(input_csvs)
-
 workflow {
-    /* ----- BASECALLING ----- */
+    /* ----- LOGGING ----- */
+    input_logger(
+        lib_csv,
+        bc_csv,
+        saf_file,
+        Channel.fromPath("$baseDir/*.yaml"),
+        {params.enable_basecalling ? params.fast5_dir : params.fastq_dir}
+    )
 
+    /* ----- BASECALLING ----- */
     if (params.enable_basecalling) {
         prefix = fast5_files.map{ it -> getPrefix(it)}.first()
 
