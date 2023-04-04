@@ -45,7 +45,7 @@ def demultiplex(bc_csv: Path, fastq: Path) -> None:
     # input example = "trimmed_forward_libN.fastq.gz" 
     prefix = fastq.name.split(".")[0].removeprefix("trimmed_") # forward_libN
 
-    cmd = f"""cutadapt -e 0.2 --no-indels -j 0 -a {bcs} -o {prefix}_{{name}}.fastq.gz {fastq}"""
+    cmd = f"""cutadapt -e 0 --no-indels -j 0 -a {bcs} -o {prefix}_{{name}}.fastq.gz {fastq}"""
     os.system(cmd)
 
 
