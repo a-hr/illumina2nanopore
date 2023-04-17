@@ -42,6 +42,6 @@ process cluster_UMI {
         path "*fastq.gz"
 
     """
-    python umiclusterer.py $bam -t $target_saf -s | gzip > ${bam.simpleName}.fastq.gz 
+    umiclusterer.py $bam -t $target_saf -s | gzip > ${bam.simpleName}.fastq.gz 
     """
 } 
