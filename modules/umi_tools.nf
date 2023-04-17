@@ -31,3 +31,17 @@ process dedup_UMI {
     umi_tools dedup -I $bam -S dedup_$bam > ${bam.simpleName}.log
     """
 }
+
+process cluster_UMI {
+    tag "$bam"
+
+    input:
+        path bam
+        path target_saf
+    output:
+        path "*fastq.gz"
+
+    """
+    python umiclusterer.py $bam -t $target_saf -s | gzip > ${bam.simpleName}.fastq.gz 
+    """
+} 

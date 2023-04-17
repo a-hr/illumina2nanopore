@@ -1,4 +1,4 @@
-process STAR_ALIGN {
+process align_STAR {
     label 'process_max'
     tag "$fastq"
 
@@ -29,7 +29,7 @@ process STAR_ALIGN {
         --outFilterScoreMinOverLread 0.66 \\
         --outFilterMatchNminOverLread 0.66 \\
         --alignEndsType Local \\
-        --outSAMattributes Standard \\
+        --outSAMattributes NH HI AS nM NM MD \\
         ${params.enable_shared_memory ? '--genomeLoad LoadAndRemove' : ''} 
     """
 }

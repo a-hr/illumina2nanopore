@@ -1,4 +1,4 @@
-process MINIMAP_ALIGN {
+process align_MINIMAP {
     tag "$fastq.simpleName"
 
     input:

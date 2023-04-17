@@ -30,11 +30,16 @@ include {
 
 include {
     extract_UMI;
-    dedup_UMI } from './modules/umi_tools'
+    dedup_UMI;
+    cluster_UMI } from './modules/umi_tools'
 
-include { STAR_ALIGN } from './modules/star'
+include { 
+    align_STAR;
+    align_STAR as consensus_STAR } from './modules/star'
 
-include { MINIMAP_ALIGN } from './modules/minimap'
+include { 
+    align_MINIMAP;
+    align_MINIMAP as consensus_MINIMAP } from './modules/minimap'
 
 include { BAM_INDEX } from './modules/samtools'
 
@@ -114,6 +119,9 @@ Channel
 Channel
     .value(params.ref_fasta)
     .set{ref_fasta}
+
+
+annotations = params.enable_isoform_counting ? saf_file : gtf_file
 
 
 // ------------ CONFIG FILES ------------
@@ -304,23 +312,26 @@ workflow {
     }
     else {
         // output channels
-        extracted_fastqs = bc_demultiplex_fastqs
+        bc_demultiplex_fastqs \
+        | flatten \
+        | filter { it.simpleName =~ /^((?!.*(unknown).*).)*$/ } \
+        | set { extracted_fastqs }
     }
 
     /* ALIGNMENT */
     if (params.enable_minimap) {
-        MINIMAP_ALIGN(ref_fasta, extracted_fastqs)
+        align_MINIMAP(ref_fasta, extracted_fastqs)
 
         // output channels
-        alignment_bams = MINIMAP_ALIGN.out
+        alignment_bams = align_MINIMAP.out
     }
     else {
-        STAR_ALIGN(extracted_fastqs, index_dir)
+        align_STAR(extracted_fastqs, index_dir)
 
-        alignment_multiqc = STAR_ALIGN.out.logs.collect()
+        alignment_multiqc = align_STAR.out.logs.collect()
 
         // output channels
-        alignment_bams = STAR_ALIGN.out.bams
+        alignment_bams = align_STAR.out.bams
     }
 
     /* DEDUPLICATION OF READS */
@@ -335,6 +346,37 @@ workflow {
         // output channels
         dedup_bams      = dedup_UMI.out.dedup_bams
         dedup_multiqc   = dedup_UMI.out.logs.collect()
+    } 
+    else if (params.enable_UMI_clustering) {
+        // cluster reads by UMI
+        cluster_UMI(
+            alignment_bams,
+            annotations
+        )
+
+        // realign clustered reads
+        if (params.enable_minimap) {
+            consensus_MINIMAP(ref_fasta, cluster_UMI.out)
+
+            // output channels
+            dedup_bams = consensus_MINIMAP.out
+        }
+        else {
+            consensus_STAR(
+                cluster_UMI.out,
+                index_dir
+            )
+
+            // output channels
+            dedup_bams = consensus_STAR.out.bams
+        }
+
+        // index clustered reads
+        dedup_bams \
+        | BAM_INDEX
+
+        dedup_multiqc   = Channel.empty()
+
     }
     else {
         alignment_bams \
@@ -346,7 +388,6 @@ workflow {
     }
 
     /* EXPRESSION QUANTIFICATION */
-    annotations = params.enable_isoform_counting ? saf_file : gtf_file
     dup_featureCounts(
         alignment_bams.collect(),
         annotations,
@@ -356,7 +397,7 @@ workflow {
     dup_featureCounts_multiqc = dup_featureCounts.out.logs.collect()
     dedup_featureCounts_multiqc = Channel.empty()
 
-    if (params.enable_UMI_treatment) {
+    if (params.enable_UMI_treatment || params.enable_UMI_clustering) {
         dedup_featureCounts(
             dedup_bams.collect(),
             annotations,
@@ -364,7 +405,6 @@ workflow {
         )
 
         dedup_featureCounts_multiqc = dedup_featureCounts.out.logs.collect()
-
     }
 
     /* RESULT CLEANING AND PLOTTING */
