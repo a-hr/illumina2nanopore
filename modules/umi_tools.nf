@@ -42,6 +42,8 @@ process cluster_UMI {
         path "*fastq.gz"
 
     """
+    # index bam file
+    python -c "import pysam; pysam.index('$bam')"
     umiclusterer.py $bam -t $target_saf -s | gzip > ${bam.simpleName}.fastq.gz 
     """
 } 
