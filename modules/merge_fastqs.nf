@@ -20,7 +20,7 @@ process merge_forward_reverse {
         enabled: params.publish_merged_complemented
 
     input:
-        path fastqs
+        path "input??.fastq.gz"
     output:
         path "*.fastq.gz"
 
