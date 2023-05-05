@@ -1,6 +1,6 @@
 # -------- BASIC CONFIG --------
-run_name: "ane_rubio_27_03_MINIMAP"
-output_dir: "${baseDir}/ane_rubio_27_03_STAR_output"
+run_name: "HTT_human_dedup"
+output_dir: "${baseDir}/HTT_human_dup_output"
 
 # -------- INPUT FASTQ --------
 fastq_dir: "${baseDir}/inputs/fastq"
@@ -15,59 +15,78 @@ config_file: "dna_r9.4.1_450bps_sup.cfg"
 # -------- ORIENTATION DEMULTIPLEXING --------
 enable_orientation_demultiplexing: true
 
-fw_fp_P5_1: "AATGATACGGCGACCACCGAGATCTACACGTTCAG" 
+# small rnaseq adapters
+# fw_fp_P5_1: "AATGATACGGCGACCACCGAGATCTACACGTTCAG" 
+# fw_tp_P3_1: "ATCTCGTATGCCGTCTTCTGCTTG"
+
+# rv_fp_P3_1: "CAAGCAGAAGACGGCATACGAGAT"
+# rv_tp_P5_1: "CTGAACGTGTAGATCTCGGTGGTCGCCGTATCATT"
+
+# std adapters
+fw_fp_P5_1: "AATGATACGGCGACCACCGAGATCTACACTCTTTCCCT"
 fw_tp_P3_1: "ATCTCGTATGCCGTCTTCTGCTTG"
+
 rv_fp_P3_1: "CAAGCAGAAGACGGCATACGAGAT"
-rv_tp_P5_1: "CTGAACGTGTAGATCTCGGTGGTCGCCGTATCATT"
+rv_tp_P5_1: "AGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT"
 
 # -------- LIBRARY DEMULTIPLEXING --------
 enable_library_demultiplexing: true
 lib_csv: "${baseDir}/inputs/csvs/libraries.csv"
 
 # --------  TRIMMING --------
-fw_P5_2: "AGTTCTACAGTCCGACGATC"
-fw_P3_2: "TGGAATTCTCGGGTGCCAAGGAACTCCAGTCAC"
+# fw_P5_2: "AGTTCTACAGTCCGACGATC"
+# fw_P3_2: "TGGAATTCTCGGGTGCCAAGGAACTCCAGTCAC"
 
-min_length: 15
-max_length: 649
+fw_P5_2: "ACACGACGCTCTTCCGATCT"
+fw_P3_2: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC"
+
+min_length: 100
+max_length: 300
 
 # -------- BARCODE DEMULTIPLEXING --------
-enable_barcode_demultiplexing: false
+enable_barcode_demultiplexing: true
 bc_csv: "${baseDir}/inputs/csvs/barcodes.csv"
 
 # -------- UMI CLUSTERING --------
-enable_UMI_treatment: false
+enable_UMI_treatment: true
 enable_UMI_clustering: false
 
-UMI_length: 6  # todo: implement in the pipeline
+UMI_length: 10
+UMI_threshold: 1
+window_size: 20
 
 # -------- ALIGNING --------
 enable_shared_memory: false
 index_dir: "/scratch/blazquL/indexes/h_index/index_h99/star_index"
+# index_dir: "/scratch/blazquL/indexes/m_index/index_m99"
 
 # -------- MINIMAP --------
 enable_minimap: false
 ref_fasta: "/scratch/blazquL/indexes/h_index/GRCh38.primary_assembly.genome.fa" 
 
 # -------- FEATURE COUNTING --------
-enable_isoform_counting: false
+enable_isoform_counting: true
 
-saf_file: "${baseDir}/inputs/csvs/annotations.saf"
 gtf_file: "/scratch/blazquL/indexes/h_index/gencode.v41.primary_assembly.annotation.gtf"
 
-multimapping_allowed: true
-fraction_allowed: true
+saf_files:
+  humanv1: "/scratch/blazquL/alvaro/illumina2nanopore/inputs/csvs/annotations_hv1.saf"
+  humanv2: "/scratch/blazquL/alvaro/illumina2nanopore/inputs/csvs/annotations_hv2.saf"
+
+multimapping_allowed: false
+fraction_allowed: false
 
 # -------- RESULTS --------
 enable_grouping: false
-mouses: [WT, KI, YAC]
-tissues: [STR, CTX, HPC]
+mouses: []
+tissues: []
+group_control: []
 
 enable_plotting: false
 libraries: []
-samples: [WT, KI, YAC]
-targets: [hHTT_PA1_v1, hHTT_PA2_v1, hHTT_cPA1_v1, hHTT_cPA2_v1, GRN]
-controls: [NTC, Neg]
+samples: []
+targets: []
+controls: []
 groups: 2
 
 # -------- RETRIEVING INTERMEDIATE FILES --------
