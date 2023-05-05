@@ -44,8 +44,10 @@ include {
 include { BAM_INDEX } from './modules/samtools'
 
 include { 
-    featureCounts as dup_featureCounts;
-    featureCounts as dedup_featureCounts } from './modules/subread'
+    featureCounts_targeted as dup_featureCounts_targeted;
+    featureCounts_targeted as dedup_featureCounts_targeted;
+    featureCounts_global as dup_featureCounts_global;
+    featureCounts_global as dedup_featureCounts_global } from './modules/subread'
 
 include { plot_results; group_results } from './modules/visualization'
 
@@ -54,6 +56,12 @@ include { plot_results; group_results } from './modules/visualization'
 
 def getPrefix(file) {
     return (file.name =~ /(.*)_[0-9]{1,10}\.fast5/)[0][1]
+}
+
+def getSAF(bam) {
+    prefix = bam.baseName.split("_")[0]
+    saf = params.saf_files[prefix]
+    return tuple(saf, bam)
 }
 
 
@@ -92,14 +100,9 @@ if (params.enable_basecalling) {
 
 if (!params.enable_isoform_counting) {
     Channel
-        .fromPath(params.gtf_file)
+        .fromPath("${params.gtf_file}")
         .set{gtf_file}
-} else {
-    Channel
-        .value(1)
-        .set{gtf_file}  // dummy file
 }
-
 
 // ------------ RESOURCE FILES ------------
 
@@ -358,43 +361,84 @@ workflow {
     }
 
     /* EXPRESSION QUANTIFICATION */
-    dup_featureCounts(
-        alignment_bams.collect(),
-        gtf_file,
-        "dup"
-    )
 
-    multiqc_logs = multiqc_logs.concat(dup_featureCounts.out.logs.collect()).collect()
+    if (params.enable_isoform_counting) {
 
-    if (params.enable_UMI_treatment || params.enable_UMI_clustering) {
-        dedup_featureCounts(
-            dedup_bams.collect(),
-            gtf_file,
-            "dedup"
+        // map all bams with getSAF function (returns tuples (saf, bam))
+        // group by saf
+        // pass each grouped tuple to featureCounts (N processes, where N is the number of SAFs)
+
+        alignment_bams \
+        | collect \
+        | flatten \
+        | map { getSAF(it) } \
+        | groupTuple \
+        | set { grouped_dup_bams }
+
+        dup_featureCounts_targeted(
+            grouped_dup_bams,
+            "dup_targeted"
         )
 
-        multiqc_logs = multiqc_logs.concat(dedup_featureCounts.out.logs.collect()).collect()
+        all_counts = dup_featureCounts_targeted.out.counts.collect()
+        multiqc_logs = multiqc_logs.concat(dup_featureCounts_targeted.out.logs.collect()).collect()
+    }
+    else {
+        alignment_bams \
+        | collect \
+        | set { dup_bams }
+
+        dup_featureCounts_global(
+            dup_bams,
+            gtf_file,
+            "dup_global"
+        )
+        all_counts = dup_featureCounts_global.out.counts.collect()
+        multiqc_logs = multiqc_logs.concat(dup_featureCounts_global.out.logs.collect()).collect()
+    }
+
+    // repeat with deduplicated bams
+
+    if ((params.enable_UMI_treatment || params.enable_UMI_clustering) && params.enable_isoform_counting) {
+
+        dedup_bams \
+        | collect \
+        | flatten \
+        | map { getSAF(it) } \
+        | groupTuple \
+        | set { grouped_dedup_bams }
+
+        dedup_featureCounts_targeted(
+            grouped_dedup_bams,
+            "dedup_targeted"
+        )
+        all_counts = all_counts.concat(dedup_featureCounts_targeted.out.counts.collect())
+        multiqc_logs = multiqc_logs.concat(dedup_featureCounts_targeted.out.logs.collect()).collect()
+    } 
+    else if (!params.enable_isoform_counting && (params.enable_UMI_treatment || params.enable_UMI_clustering)) {
+        dedup_bams \
+        | collect \
+        | set { dedup_bams }
+
+        dedup_featureCounts_global(
+            dedup_bams,
+            gtf_file,
+            "dedup_global"
+        )
+        // counts not collected for downstream processing bcs no isoform counting format
+        multiqc_logs = multiqc_logs.concat(dedup_featureCounts_global.out.logs.collect()).collect()
     }
 
     /* RESULT CLEANING AND PLOTTING */
-    if (params.enable_UMI_treatment || params.enable_UMI_clustering) {
-        dedup_featureCounts.out.counts.collect() \
-        | concat(dup_featureCounts.out.counts.collect()) \
-        | plot_results
+    all_counts \
+    | flatten \
+    | group_results
 
-        dedup_featureCounts.out.counts.collect() \
-        | concat(dup_featureCounts.out.counts.collect()) \
-        | group_results
-    }
-    else {
-        dup_featureCounts.out.counts.collect() \
-        | plot_results
+    all_counts \
+    | flatten \
+    | plot_results
 
-        dup_featureCounts.out.counts.collect() \
-        | group_results
-    }
-
-    // multiqc TODO: add input channels in modular way
+    /* MULTIQC REPORT */
     multiqc(
         multiqc_logs,
         multiqc_config
