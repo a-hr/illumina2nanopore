@@ -12,8 +12,17 @@ process featureCounts {
         path "*.summary", emit: logs
 
     script:
+    
     def multimap = params.multimapping_allowed ? ' -M' : ''
     def fraction = params.fraction_allowed ? ' --fraction' : ''
+
+    if (params.enable_isoform_counting) {
+        def saf = params.saf_files[bams[0].split("_")[0]][0]
+        """
+        featureCounts -T ${task.cpus} $multimap $fraction -a $saf -o ${prefix}_counts.tsv $bams -F 'SAF'
+        sed -i '1d ; 2 s/${prefix}_//g ; 2 s/Aligned.sortedByCoord.out.bam//g' ${prefix}_counts.tsv
+        """
+    }
 
     if (params.fraction_allowed || params.multimapping_allowed) {
         """
@@ -25,12 +34,6 @@ process featureCounts {
         featureCounts -T ${task.cpus} -a ${annotations} -o ${prefix}_counts.tsv $bams
         sed -i '1d ; 2 s/${prefix}_//g ; 2 s/Aligned.sortedByCoord.out.bam//g; 2 s/trimmed_final_//g' ${prefix}_counts.tsv
         """
-    } else if (params.enable_isoform_counting) {
-        // no isoform counting in fraction mode or multimapping mode, since it gives specific coordinates.
-        """
-        featureCounts -T ${task.cpus} ${multimap} ${fraction} -a ${annotations} -o ${prefix}_counts.tsv $bams -F 'SAF'
-        sed -i '1d ; 2 s/${prefix}_//g ; 2 s/Aligned.sortedByCoord.out.bam//g' ${prefix}_counts.tsv
-        """
-    }
+    } 
 
 }

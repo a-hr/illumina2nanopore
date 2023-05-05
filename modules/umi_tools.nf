@@ -11,8 +11,9 @@ process extract_UMI {
         path "UMI_$fastq"
     
     script:
+    def ns = "N" * params.UMI_length
     """
-    umi_tools extract --bc-pattern=NNNNNN -I $fastq -S UMI_${fastq}
+    umi_tools extract --bc-pattern=$ns -I $fastq -S UMI_${fastq}
     """
 }
 
@@ -23,12 +24,13 @@ process dedup_UMI {
     input:
         path bam
     output:
-        path "dedup_$bam", emit: dedup_bams
+        path "dedup_bam/$bam", emit: dedup_bams
         path "${bam.simpleName}.log", emit: logs
     
     """
     samtools index $bam
-    umi_tools dedup -I $bam -S dedup_$bam > ${bam.simpleName}.log
+    mkdir dedup_bam
+    umi_tools dedup -I $bam -S dedup_bam/$bam > ${bam.simpleName}.log
     """
 }
 
@@ -37,13 +39,15 @@ process cluster_UMI {
 
     input:
         path bam
-        path target_saf
     output:
         path "*fastq.gz"
 
+    script:
+    def th = params.UMI_threshold
+    def window = params.window_size
     """
     # index bam file
     python -c "import pysam; pysam.index('$bam')"
-    umiclusterer.py $bam -t $target_saf -s | gzip > ${bam.simpleName}.fastq.gz 
+    umiclusterer.py $bam  -j ${task.cpus} -t $th -w $window | gzip > ${bam.simpleName}.fastq.gz 
     """
 } 

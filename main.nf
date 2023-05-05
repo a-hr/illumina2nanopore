@@ -64,20 +64,18 @@ process input_logger {
     publishDir "${params.output_dir}/input_logs", mode: 'copy'
 
     input:
-        path lib_csv
-        path bc_csv
-        path saf
+        val csv_dir
         path input_params
         path fastq_dir  // can be either fastq_dir or fast5_dir
 
     output:
-        path "*.txt"
-        path "*.csv", includeInputs: true
-        path "*.yaml", includeInputs: true
-    
-    """
-    ls $fastq_dir > input_files.txt
-    """
+        path "*", includeInputs: true
+
+    script:
+        """
+        cp ${csv_dir.getParent()}/* .
+        ls $fastq_dir > input_files.txt
+        """
 }
 
 
@@ -96,6 +94,10 @@ if (!params.enable_isoform_counting) {
     Channel
         .fromPath(params.gtf_file)
         .set{gtf_file}
+} else {
+    Channel
+        .value(1)
+        .set{gtf_file}  // dummy file
 }
 
 
@@ -111,18 +113,11 @@ Channel
     .value(params.lib_csv)
     .set{lib_csv}
 Channel
-    .value(params.multiqc_config)
-    .set{multiqc_config}
-Channel
-    .value(params.saf_file)
-    .set{saf_file}
+    .fromPath(params.lib_csv)
+    .set{csv_dir}
 Channel
     .value(params.ref_fasta)
     .set{ref_fasta}
-
-
-annotations = params.enable_isoform_counting ? saf_file : gtf_file
-
 
 // ------------ CONFIG FILES ------------
 
@@ -150,9 +145,7 @@ Channel
 workflow {
     /* ----- LOGGING ----- */
     input_logger(
-        lib_csv,
-        bc_csv,
-        saf_file,
+        csv_dir,
         Channel.fromPath("$baseDir/*.yaml"),
         {params.enable_basecalling ? params.fast5_dir : params.fastq_dir}
     )
@@ -174,14 +167,9 @@ workflow {
     
     // raw read QC
     raw_fastqc(fastq_file)
-    fastqc_logs = raw_fastqc.out
+    multiqc_logs = raw_fastqc.out
     
     /* ----- ORIENTATION DEMULTIPLEXING ----- */
-    /*
-    - demultiplex fw and rv reads based on orientation
-    - remove P5 and P3 adapters
-    - QC on demultiplexed files
-    */
     if (params.enable_orientation_demultiplexing) {
 
         demultiplex_orientation(
@@ -198,27 +186,21 @@ workflow {
             "orientation_dmplexed"
         )
 
-        fastqc_logs = fastqc_logs
+        multiqc_logs = multiqc_logs
             .concat(oriented_fastqc.out)
             .collect()  // makes multiqc wait for all to be emitted
 
         // output channels
         oriented_fastqs     = demultiplex_orientation.out.trimmed_fastqs
-        dmplx_orient_logs   = demultiplex_orientation.out.log
+        multiqc_logs        = multiqc_logs.concat(demultiplex_orientation.out.log)
 
     }
     else {
         // output channels
         oriented_fastqs     = fastq_file
-        dmplx_orient_logs   = Channel.empty()
     }
 
     /* ----- REVERSE COMPLEMENT OF TRIMMED READS ----- */
-    /*
-    - merge fw_R1 and rv_R2 into final_R1
-    - discard fw_R2, rv_R1 and unknown
-    */
-
     oriented_fastqs \
     | flatten \
     | filter { it.simpleName =~ /^((?!.*(unknown).*).)*$/ } \
@@ -251,13 +233,12 @@ workflow {
         | filter { it.simpleName =~ /^((?!.*(unknown).*).)*$/ } \
         | set {lib_dmplexed_fastqs}
 
-        dmplx_lib_logs = demultiplex_library.out.log.collect()
+        multiqc_logs = multiqc_logs.concat(demultiplex_library.out.log.collect())
 
     }
     else {
         // output channels
-        lib_dmplexed_fastqs     = complemented_fastqs
-        dmplx_lib_logs          = Channel.empty()
+        lib_dmplexed_fastqs = complemented_fastqs
     }
 
 
@@ -272,10 +253,9 @@ workflow {
         "adapter_trimmed"
     )
 
-    adapter_trim_logs = adapter_trim.out.log.collect()
+    multiqc_logs = multiqc_logs.concat(adapter_trim.out.log.collect())
     
     /* BARCODE DEMULTIPLEXING */
-
     if (params.enable_barcode_demultiplexing) {
 
         demultiplex_bc(
@@ -290,18 +270,17 @@ workflow {
 
         // output channels
         bc_demultiplex_fastqs   = demultiplex_bc.out.fastqs
-        bc_demultiplex_logs     = demultiplex_bc.out.log
+        multiqc_logs            = multiqc_logs.concat(demultiplex_bc.out.log)
 
     }
     else {
         // output channels
         bc_demultiplex_fastqs   = adapter_trim.out.fastqs
-        bc_demultiplex_logs     = Channel.empty()
     }
 
     /* EXTRACT UMI */
 
-    if (params.enable_UMI_treatment) {
+    if (params.enable_UMI_treatment || params.enable_UMI_clustering) {
         bc_demultiplex_fastqs \
         | flatten \
         | filter { it.simpleName =~ /^((?!.*(unknown).*).)*$/ } \
@@ -328,7 +307,7 @@ workflow {
     else {
         align_STAR(extracted_fastqs, index_dir)
 
-        alignment_multiqc = align_STAR.out.logs.collect()
+        multiqc_logs   = multiqc_logs.concat(align_STAR.out.logs.collect())
 
         // output channels
         alignment_bams = align_STAR.out.bams
@@ -345,14 +324,12 @@ workflow {
 
         // output channels
         dedup_bams      = dedup_UMI.out.dedup_bams
-        dedup_multiqc   = dedup_UMI.out.logs.collect()
+        multiqc_logs    = multiqc_logs.concat(dedup_UMI.out.logs.collect())
     } 
     else if (params.enable_UMI_clustering) {
         // cluster reads by UMI
-        cluster_UMI(
-            alignment_bams,
-            annotations
-        )
+        alignment_bams \
+        | cluster_UMI
 
         // realign clustered reads
         if (params.enable_minimap) {
@@ -374,41 +351,33 @@ workflow {
         // index clustered reads
         dedup_bams \
         | BAM_INDEX
-
-        dedup_multiqc   = Channel.empty()
-
     }
     else {
         alignment_bams \
         | BAM_INDEX
-        
-        // output channels
-        dedup_bams      = Channel.empty()
-        dedup_multiqc   = Channel.empty()
     }
 
     /* EXPRESSION QUANTIFICATION */
     dup_featureCounts(
         alignment_bams.collect(),
-        annotations,
+        gtf_file,
         "dup"
     )
 
-    dup_featureCounts_multiqc = dup_featureCounts.out.logs.collect()
-    dedup_featureCounts_multiqc = Channel.empty()
+    multiqc_logs = multiqc_logs.concat(dup_featureCounts.out.logs.collect()).collect()
 
     if (params.enable_UMI_treatment || params.enable_UMI_clustering) {
         dedup_featureCounts(
             dedup_bams.collect(),
-            annotations,
+            gtf_file,
             "dedup"
         )
 
-        dedup_featureCounts_multiqc = dedup_featureCounts.out.logs.collect()
+        multiqc_logs = multiqc_logs.concat(dedup_featureCounts.out.logs.collect()).collect()
     }
 
     /* RESULT CLEANING AND PLOTTING */
-    if (params.enable_UMI_treatment) {
+    if (params.enable_UMI_treatment || params.enable_UMI_clustering) {
         dedup_featureCounts.out.counts.collect() \
         | concat(dup_featureCounts.out.counts.collect()) \
         | plot_results
@@ -426,16 +395,8 @@ workflow {
     }
 
     // multiqc TODO: add input channels in modular way
-    // multiqc(
-    //     fastqc_logs,
-    //     dmplx_orient_logs,
-    //     dmplx_lib_logs,
-    //     adapter_trim_logs,
-    //     bc_demultiplex_logs,
-    //     alignment_multiqc,
-    //     dedup_multiqc,
-    //     featureCounts_multiqc,
-    //     multiqc_config
-    // )
-
+    multiqc(
+        multiqc_logs,
+        multiqc_config
+    )
 }
